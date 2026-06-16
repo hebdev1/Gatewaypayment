@@ -1,5 +1,6 @@
 import { requireApiKey } from "../_shared/auth.ts";
 import { corsHeaders, errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
+import { getEnv } from "../_shared/env.ts";
 import { calculatePaymentAmounts, GATEWAY_FEE_BPS } from "../_shared/money.ts";
 import { getProviderAdapter } from "../_shared/providers/index.ts";
 import { adminClient } from "../_shared/supabase.ts";
@@ -85,7 +86,7 @@ Deno.serve(async (request) => {
     }
 
     const paymentId = crypto.randomUUID();
-    const hostedCheckoutUrl = `${Deno.env.get("PUBLIC_SITE_URL") ?? "http://localhost:3000"}/checkout/${paymentId}`;
+    const hostedCheckoutUrl = `${getEnv("PUBLIC_SITE_URL") ?? "http://localhost:3000"}/checkout/${paymentId}`;
 
     const { data: payment, error: insertError } = await supabase
       .from("payments")

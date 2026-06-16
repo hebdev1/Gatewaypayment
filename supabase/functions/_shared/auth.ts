@@ -1,3 +1,4 @@
+import { getEnv } from "./env.ts";
 import { sha256Hex } from "./crypto.ts";
 
 export type MerchantApiAuth = {
@@ -63,7 +64,7 @@ export async function requireApiKey(request: Request, supabase: any): Promise<Me
 }
 
 export function requireInternalSecret(request: Request) {
-  const configured = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  const configured = getEnv("INTERNAL_FUNCTION_SECRET");
   const provided = request.headers.get("x-internal-secret");
 
   if (!configured || !provided || provided !== configured) {
@@ -72,7 +73,7 @@ export function requireInternalSecret(request: Request) {
 }
 
 export async function authorizeInternalOrApiKey(request: Request, supabase: any) {
-  const configured = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+  const configured = getEnv("INTERNAL_FUNCTION_SECRET");
   const provided = request.headers.get("x-internal-secret");
 
   if (configured && provided === configured) {

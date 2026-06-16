@@ -1,4 +1,5 @@
 import { corsHeaders, errorResponse, jsonResponse, readJson } from "../_shared/http.ts";
+import { getEnv } from "../_shared/env.ts";
 import { adminClient } from "../_shared/supabase.ts";
 
 type ProviderWebhookBody = {
@@ -48,8 +49,8 @@ Deno.serve(async (request) => {
       payload: body
     });
 
-    const functionsUrl = Deno.env.get("FUNCTIONS_URL") ?? Deno.env.get("SUPABASE_FUNCTIONS_URL");
-    const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+    const functionsUrl = getEnv("FUNCTIONS_URL") ?? getEnv("SUPABASE_FUNCTIONS_URL");
+    const internalSecret = getEnv("INTERNAL_FUNCTION_SECRET");
 
     if (functionsUrl && internalSecret) {
       await fetch(`${functionsUrl}/verify-payment`, {

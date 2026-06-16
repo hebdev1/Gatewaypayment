@@ -1,3 +1,5 @@
+import { getEnv } from "./env.ts";
+
 function bytesToHex(bytes: ArrayBuffer) {
   return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -28,7 +30,7 @@ export async function hmacSha256Hex(secret: string, message: string) {
 }
 
 async function importAesKey() {
-  const raw = Deno.env.get("CREDENTIAL_ENCRYPTION_KEY");
+  const raw = getEnv("CREDENTIAL_ENCRYPTION_KEY");
 
   if (!raw) {
     throw new Error("Missing CREDENTIAL_ENCRYPTION_KEY.");
