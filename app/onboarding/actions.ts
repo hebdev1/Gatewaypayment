@@ -2,11 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function createMerchantAction(formData: FormData) {
   const userId = await requireUserId();
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const displayName = String(formData.get("display_name") ?? "").trim();
   const legalName = String(formData.get("legal_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -36,6 +36,7 @@ export async function createMerchantAction(formData: FormData) {
   });
 
   if (memberError) {
+    await supabase.from("merchants").delete().eq("id", merchant.id);
     redirect(`/onboarding?error=${encodeURIComponent(memberError.message)}`);
   }
 
