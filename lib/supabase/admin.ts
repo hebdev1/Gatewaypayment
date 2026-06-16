@@ -6,7 +6,7 @@ import { cleanEnvValue, requireEnv } from "@/lib/env";
 export function createAdminClient() {
   return createClient(
     requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    cleanEnvValue(process.env.SUPABASE_SECRET_KEY) ?? requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY) ?? requireEnv("SUPABASE_SECRET_KEY"),
     {
       auth: {
         autoRefreshToken: false,
