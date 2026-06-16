@@ -1,0 +1,13 @@
+project_id = "ohymckfsvkvvshexwuun"
+
+[functions.create-payment]
+verify_jwt = false
+
+[functions.verify-payment]
+verify_jwt = false
+
+[functions.dispatch-webhooks]
+verify_jwt = false
+
+[functions.provider-webhook]
+verify_jwt = false

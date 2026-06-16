@@ -1,0 +1,14 @@
+.next
+node_modules
+.env
+.env.local
+.env.*.local
+!.env.example
+dist
+coverage
+*.tsbuildinfo
+.agents
+work
+outputs
+skills-lock.json
+supabase/.temp
