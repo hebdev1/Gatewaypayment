@@ -1,5 +1,15 @@
 import Link from "next/link";
-import { CreditCard, Home, KeyRound, LogOut, RadioTower, Settings } from "lucide-react";
+import {
+  CreditCard,
+  Home,
+  KeyRound,
+  LogOut,
+  RadioTower,
+  ReceiptText,
+  RotateCcw,
+  Settings,
+  ShieldCheck
+} from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
 import { requireMerchant } from "@/lib/auth";
 
@@ -27,6 +37,14 @@ export default async function DashboardLayout({
             <Home size={17} aria-hidden="true" />
             Dashboard
           </Link>
+          <Link className="nav-link" href="/dashboard/payments">
+            <ReceiptText size={17} aria-hidden="true" />
+            Payments
+          </Link>
+          <Link className="nav-link" href="/dashboard/refunds">
+            <RotateCcw size={17} aria-hidden="true" />
+            Refunds
+          </Link>
           <Link className="nav-link" href="/dashboard/api-keys">
             <KeyRound size={17} aria-hidden="true" />
             API keys
@@ -38,6 +56,10 @@ export default async function DashboardLayout({
           <Link className="nav-link" href="/dashboard/webhooks">
             <RadioTower size={17} aria-hidden="true" />
             Webhooks
+          </Link>
+          <Link className="nav-link" href="/dashboard/kyc">
+            <ShieldCheck size={17} aria-hidden="true" />
+            KYC
           </Link>
           <form action={signOutAction} className="sidebar-footer">
             <button className="nav-button" type="submit">

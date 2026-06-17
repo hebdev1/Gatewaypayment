@@ -23,8 +23,25 @@ export type ProviderVerifyPaymentResult = {
   raw: unknown;
 };
 
+export type ProviderRefundPaymentInput = {
+  providerTransactionId: string;
+  amount: number;
+  currency: string;
+  reason?: string;
+  refundId: string;
+};
+
+export type ProviderRefundPaymentResult = {
+  status: "pending" | "succeeded" | "failed";
+  providerRefundId?: string;
+  raw: unknown;
+};
+
 export interface PaymentProviderAdapter {
   name: ProviderName;
   createPayment(input: ProviderCreatePaymentInput): Promise<ProviderCreatePaymentResult>;
   verifyPayment(input: ProviderVerifyPaymentInput): Promise<ProviderVerifyPaymentResult>;
+  // Optional. If undefined, the gateway records the refund as 'pending'
+  // and expects the merchant to settle it manually with the provider.
+  refundPayment?(input: ProviderRefundPaymentInput): Promise<ProviderRefundPaymentResult>;
 }

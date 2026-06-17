@@ -1,4 +1,4 @@
-import { requireInternalSecret } from "../_shared/auth.ts";
+import { requireDispatcherSecret } from "../_shared/auth.ts";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { signWebhookPayload } from "../_shared/webhooks.ts";
@@ -15,7 +15,7 @@ Deno.serve(async (request) => {
   const supabase = adminClient();
 
   try {
-    requireInternalSecret(request);
+    requireDispatcherSecret(request);
 
     const { data: deliveries, error } = await supabase
       .from("webhook_deliveries")

@@ -3,6 +3,8 @@ import { requireMerchant } from "@/lib/auth";
 import { formatMoney } from "@/lib/payments/money";
 import { createClient } from "@/lib/supabase/server";
 
+import Link from "next/link";
+
 type PaymentRow = {
   id: string;
   merchant_order_id: string;
@@ -13,6 +15,7 @@ type PaymentRow = {
   gateway_fee_amount: string;
   provider_fee_amount: string;
   merchant_net_amount: string;
+  refunded_amount: string;
   currency: string;
   created_at: string;
 };
@@ -35,6 +38,14 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: false })
       .limit(10)
   ]);
+
+  const { data: latestKyc } = await supabase
+    .from("kyc_submissions")
+    .select("status")
+    .eq("merchant_id", merchant.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   const totals = (summaries ?? []).reduce(
     (acc, row) => ({
@@ -60,6 +71,20 @@ export default async function DashboardPage() {
           <span className={`status-pill ${merchant.status}`}>{merchant.status}</span>
         </div>
       </header>
+
+      {!merchant.live_enabled ? (
+        <section className="notice" style={{ marginBottom: 18 }}>
+          <strong>Live mode is locked.</strong>{" "}
+          {latestKyc?.status === "submitted" ? (
+            <>Your KYC submission is under review. We&apos;ll email you when it&apos;s approved.</>
+          ) : (
+            <>
+              Complete the <a href="/dashboard/kyc">KYC verification</a> to unlock live
+              payments.
+            </>
+          )}
+        </section>
+      ) : null}
 
       <section className="metrics-grid" aria-label="Payment metrics">
         <article className="metric-card">
@@ -110,6 +135,7 @@ export default async function DashboardPage() {
                 <th>Gateway fee</th>
                 <th>Provider fee</th>
                 <th>Net</th>
+                <th>Refunded</th>
                 <th>Provider</th>
                 <th>Created</th>
               </tr>
@@ -117,7 +143,11 @@ export default async function DashboardPage() {
             <tbody>
               {(payments as PaymentRow[] | null)?.map((payment) => (
                 <tr key={payment.id}>
-                  <td className="mono">{payment.merchant_order_id}</td>
+                  <td className="mono">
+                    <Link href={`/dashboard/payments/${payment.id}`}>
+                      {payment.merchant_order_id}
+                    </Link>
+                  </td>
                   <td><span className="mode-pill">{payment.mode}</span></td>
                   <td>
                     <span className={`status-pill ${payment.status}`}>{payment.status}</span>
@@ -126,6 +156,11 @@ export default async function DashboardPage() {
                   <td>{formatMoney(payment.gateway_fee_amount, payment.currency)}</td>
                   <td>{formatMoney(payment.provider_fee_amount, payment.currency)}</td>
                   <td>{formatMoney(payment.merchant_net_amount, payment.currency)}</td>
+                  <td>
+                    {Number(payment.refunded_amount) > 0
+                      ? formatMoney(payment.refunded_amount, payment.currency)
+                      : "—"}
+                  </td>
                   <td>{payment.provider}</td>
                   <td>{new Date(payment.created_at).toLocaleString()}</td>
                 </tr>

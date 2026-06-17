@@ -72,6 +72,30 @@ export function requireInternalSecret(request: Request) {
   }
 }
 
+// Separate secret for the pg_cron → dispatch-webhooks call so the cron
+// job can rotate independently of INTERNAL_FUNCTION_SECRET. Falls back to
+// INTERNAL_FUNCTION_SECRET if DISPATCHER_SECRET is not set, so existing
+// deployments keep working.
+export function requireDispatcherSecret(request: Request) {
+  const dispatcher = getEnv("DISPATCHER_SECRET");
+  const internal = getEnv("INTERNAL_FUNCTION_SECRET");
+  const provided = request.headers.get("x-internal-secret");
+
+  if (!provided) {
+    throw new Response("Unauthorized.", { status: 401 });
+  }
+
+  if (dispatcher && provided === dispatcher) {
+    return;
+  }
+
+  if (internal && provided === internal) {
+    return;
+  }
+
+  throw new Response("Unauthorized.", { status: 401 });
+}
+
 export async function authorizeInternalOrApiKey(request: Request, supabase: any) {
   const configured = getEnv("INTERNAL_FUNCTION_SECRET");
   const provided = request.headers.get("x-internal-secret");

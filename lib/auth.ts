@@ -25,9 +25,30 @@ export async function getCurrentMerchant() {
   const userId = await requireUserId();
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // Defence in depth: explicitly filter by ownership/membership instead
+  // of relying solely on RLS. The membership check uses the admin client
+  // because RLS on merchant_members may not let the user see rows they
+  // don't already own.
+  const { data: memberRows } = await createAdminClient()
+    .from("merchant_members")
+    .select("merchant_id")
+    .eq("user_id", userId);
+
+  const memberMerchantIds = (memberRows ?? []).map((row) => row.merchant_id);
+
+  let query = supabase
     .from("merchants")
-    .select("id, display_name, status, live_enabled, default_currency")
+    .select("id, display_name, status, live_enabled, default_currency, owner_user_id");
+
+  if (memberMerchantIds.length > 0) {
+    query = query.or(
+      `owner_user_id.eq.${userId},id.in.(${memberMerchantIds.join(",")})`
+    );
+  } else {
+    query = query.eq("owner_user_id", userId);
+  }
+
+  const { data, error } = await query
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -38,7 +59,15 @@ export async function getCurrentMerchant() {
 
   return {
     userId,
-    merchant: data as CurrentMerchant | null
+    merchant: data
+      ? ({
+          id: data.id,
+          display_name: data.display_name,
+          status: data.status,
+          live_enabled: data.live_enabled,
+          default_currency: data.default_currency
+        } as CurrentMerchant)
+      : null
   };
 }
 

@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { requireMerchant } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveMoncashCredentialsAction } from "./actions";
+import { InboundWebhookCard } from "./inbound-webhook-card";
 
 type ProviderAccount = {
   id: string;
@@ -13,6 +14,8 @@ type ProviderAccount = {
     api_base_url?: string;
     gateway_base_url?: string;
   } | null;
+  inbound_webhook_token_prefix: string | null;
+  inbound_webhook_token_rotated_at: string | null;
 };
 
 function ProviderForm({
@@ -128,7 +131,9 @@ export default async function ProviderSettingsPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("payment_provider_accounts")
-    .select("id, mode, enabled, provider_fee_bps, provider_fee_fixed, metadata")
+    .select(
+      "id, mode, enabled, provider_fee_bps, provider_fee_fixed, metadata, inbound_webhook_token_prefix, inbound_webhook_token_rotated_at"
+    )
     .eq("merchant_id", merchant.id)
     .eq("provider", "moncash");
 
@@ -149,6 +154,27 @@ export default async function ProviderSettingsPage() {
         <ProviderForm mode="sandbox" account={sandbox} liveEnabled={merchant.live_enabled} />
         <ProviderForm mode="live" account={live} liveEnabled={merchant.live_enabled} />
       </div>
+
+      {sandbox || live ? (
+        <div className="split-grid" style={{ marginTop: 18 }}>
+          {sandbox ? (
+            <InboundWebhookCard
+              accountId={sandbox.id}
+              tokenPrefix={sandbox.inbound_webhook_token_prefix}
+              rotatedAt={sandbox.inbound_webhook_token_rotated_at}
+              mode="sandbox"
+            />
+          ) : null}
+          {live ? (
+            <InboundWebhookCard
+              accountId={live.id}
+              tokenPrefix={live.inbound_webhook_token_prefix}
+              rotatedAt={live.inbound_webhook_token_rotated_at}
+              mode="live"
+            />
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

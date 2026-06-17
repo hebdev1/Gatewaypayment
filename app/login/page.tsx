@@ -38,6 +38,9 @@ export default async function LoginPage({
         </form>
 
         <p className="auth-switch">
+          <Link href="/forgot-password">Forgot your password?</Link>
+        </p>
+        <p className="auth-switch">
           New merchant? <Link href="/register">Create an account</Link>
         </p>
       </section>
