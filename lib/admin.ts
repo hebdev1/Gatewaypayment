@@ -40,11 +40,11 @@ export async function requireAdmin(): Promise<AdminProfile> {
 export async function recordAudit(input: {
   actorUserId: string;
   action: string;
-  targetTable?: string;
-  targetId?: string;
+  targetTable?: string | null;
+  targetId?: string | null;
   before?: unknown;
   after?: unknown;
-  notes?: string;
+  notes?: string | null;
 }) {
   const admin = createAdminClient();
   await admin.from("admin_audit_log").insert({
