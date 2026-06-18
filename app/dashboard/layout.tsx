@@ -8,7 +8,8 @@ import {
   ReceiptText,
   RotateCcw,
   Settings,
-  ShieldCheck
+  ShieldCheck,
+  UserCog
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -76,6 +77,10 @@ export default async function DashboardLayout({
           <Link className="nav-link" href="/dashboard/kyc">
             <ShieldCheck size={17} aria-hidden="true" />
             KYC
+          </Link>
+          <Link className="nav-link" href="/dashboard/settings">
+            <UserCog size={17} aria-hidden="true" />
+            Settings
           </Link>
           <form action={signOutAction} className="sidebar-footer">
             <button className="nav-button" type="submit">
