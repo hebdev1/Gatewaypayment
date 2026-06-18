@@ -51,10 +51,6 @@ export default async function AdminLayout({
             <RadioTower size={17} aria-hidden="true" />
             Webhook deliveries
           </Link>
-          <Link className="nav-link" href="/dashboard">
-            <Store size={17} aria-hidden="true" />
-            ← My merchant
-          </Link>
           <form action={signOutAction} className="sidebar-footer">
             <button className="nav-button" type="submit">
               <LogOut size={17} aria-hidden="true" />

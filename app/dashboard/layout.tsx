@@ -10,17 +10,31 @@ import {
   Settings,
   ShieldCheck
 } from "lucide-react";
+import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireUserId } from "@/lib/auth";
 import { signOutAction } from "@/app/login/actions";
 import { requireMerchant } from "@/lib/auth";
-import { getCurrentAdmin } from "@/lib/admin";
 
 export default async function DashboardLayout({
   children
 }: {
   children: React.ReactNode;
 }) {
+  // Admins go straight to /admin; the merchant panel is for merchants only.
+  const userId = await requireUserId();
+  const admin = createAdminClient();
+  const { data: adminRow } = await admin
+    .from("app_admins")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (adminRow) {
+    redirect("/admin");
+  }
+
   const { merchant } = await requireMerchant();
-  const admin = await getCurrentAdmin();
 
   return (
     <div className="app-shell">
@@ -63,12 +77,6 @@ export default async function DashboardLayout({
             <ShieldCheck size={17} aria-hidden="true" />
             KYC
           </Link>
-          {admin ? (
-            <Link className="nav-link" href="/admin" style={{ color: "var(--accent-dark)" }}>
-              <ShieldCheck size={17} aria-hidden="true" />
-              Admin panel →
-            </Link>
-          ) : null}
           <form action={signOutAction} className="sidebar-footer">
             <button className="nav-button" type="submit">
               <LogOut size={17} aria-hidden="true" />

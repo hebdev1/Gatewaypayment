@@ -1,14 +1,25 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+async function routeForUser(userId: string): Promise<"/admin" | "/dashboard"> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("app_admins")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data ? "/admin" : "/dashboard";
+}
 
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
   });
@@ -17,7 +28,9 @@ export async function signInAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/dashboard");
+  const userId = data.user?.id;
+  const target = userId ? await routeForUser(userId) : "/dashboard";
+  redirect(target);
 }
 
 export async function signUpAction(formData: FormData) {
