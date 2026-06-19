@@ -3,6 +3,7 @@ import { requireMerchant } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { disableWebhookEndpointAction } from "./actions";
 import { WebhookEndpointForm } from "./webhook-form";
+import { WebhookTestForm } from "./test-form";
 
 type WebhookEndpoint = {
   id: string;
@@ -93,6 +94,19 @@ export default async function WebhooksPage() {
           </div>
         </section>
       </div>
+
+      <section className="data-card" style={{ marginTop: 18 }}>
+        <div className="data-card-header">
+          <h2>Test event</h2>
+        </div>
+        <WebhookTestForm
+          endpoints={
+            ((endpoints as WebhookEndpoint[] | null) ?? [])
+              .filter((e) => e.enabled)
+              .map((e) => ({ id: e.id, url: e.url, mode: e.mode }))
+          }
+        />
+      </section>
 
       <section className="data-card" style={{ marginTop: 18 }}>
         <div className="data-card-header">

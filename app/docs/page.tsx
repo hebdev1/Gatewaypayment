@@ -43,6 +43,15 @@ export default function DocsPage() {
             <Shield size={14} aria-hidden="true" /> Security
           </a>
           <a href="#errors">Errors</a>
+
+          <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+            <p className="eyebrow" style={{ marginBottom: 8 }}>Resources</p>
+            <a href="/openapi.yaml" download>📄 OpenAPI 3.1 spec</a>
+            <br />
+            <a href="/postman.json" download>📦 Postman collection</a>
+            <br />
+            <a href="https://www.npmjs.com/package/@haitipay/node" target="_blank" rel="noreferrer">📥 npm @haitipay/node</a>
+          </div>
         </nav>
       </aside>
 

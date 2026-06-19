@@ -1,0 +1,296 @@
+openapi: 3.1.0
+info:
+  title: HaitiPay Gateway API
+  version: "0.2.0"
+  description: |
+    REST API for HaitiPay — accept MonCash (and soon NatCash + cards) for
+    Haitian merchants. All endpoints require Bearer API key authentication
+    with keys prefixed `sk_test_` (sandbox) or `sk_live_` (live).
+  contact:
+    name: HaitiPay Support
+    url: https://gatewaypayment.vercel.app/docs
+servers:
+  - url: https://ohymckfsvkvvshexwuun.functions.supabase.co
+    description: Production
+security:
+  - bearerAuth: []
+tags:
+  - name: Payments
+  - name: Refunds
+paths:
+  /create-payment:
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      description: |
+        Creates a payment record and returns the hosted checkout URL plus
+        the provider's gateway URL. Idempotent on the tuple
+        `(merchant_id, mode, orderId)`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentInput"
+      responses:
+        "200":
+          description: Payment created (or returned from idempotency cache)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePaymentResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/ProviderError"
+
+  /verify-payment:
+    post:
+      tags: [Payments]
+      summary: Verify a payment status
+      description: |
+        Forces a fresh status pull from the provider. Useful for
+        poll-based reconciliation; webhooks remain the recommended path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPaymentInput"
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  payment:
+                    $ref: "#/components/schemas/Payment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /create-refund:
+    post:
+      tags: [Refunds]
+      summary: Create a refund
+      description: |
+        Refunds a succeeded payment. Pass `amount` for partial refunds;
+        omit to refund the remaining balance. Use `merchant_refund_id`
+        for client-side idempotency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRefundInput"
+      responses:
+        "200":
+          description: Refund created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refund:
+                    $ref: "#/components/schemas/Refund"
+                  idempotent: { type: boolean }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Payment not refundable / fully refunded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: sk_{test|live}_…
+
+  schemas:
+    Currency:
+      type: string
+      pattern: "^[A-Z]{3}$"
+      example: HTG
+
+    PaymentStatus:
+      type: string
+      enum: [created, pending, succeeded, failed, canceled, expired]
+
+    PaymentMode:
+      type: string
+      enum: [sandbox, live]
+
+    CreatePaymentInput:
+      type: object
+      required: [amount, orderId]
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+          example: 500
+        currency:
+          $ref: "#/components/schemas/Currency"
+        orderId:
+          type: string
+          example: ORDER-1001
+        provider:
+          type: string
+          enum: [moncash]
+        customer:
+          type: object
+          properties:
+            email: { type: string, format: email }
+            phone: { type: string }
+        description: { type: string }
+        success_url: { type: string, format: uri }
+        cancel_url: { type: string, format: uri }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        merchant_order_id: { type: string }
+        provider: { type: string }
+        mode: { $ref: "#/components/schemas/PaymentMode" }
+        status: { $ref: "#/components/schemas/PaymentStatus" }
+        amount_gross: { type: string, description: "Decimal" }
+        currency: { $ref: "#/components/schemas/Currency" }
+        display_amount: { type: string, nullable: true }
+        display_currency: { type: string, nullable: true }
+        exchange_rate_used: { type: string, nullable: true }
+        gateway_fee_amount: { type: string }
+        provider_fee_amount: { type: string }
+        merchant_net_amount: { type: string }
+        refunded_amount: { type: string }
+        hosted_checkout_url: { type: string, nullable: true }
+        provider_checkout_url: { type: string, nullable: true }
+        provider_transaction_id: { type: string, nullable: true }
+        customer_email: { type: string, nullable: true }
+        customer_phone: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        paid_at: { type: string, format: date-time, nullable: true }
+
+    CreatePaymentResult:
+      type: object
+      properties:
+        payment:
+          $ref: "#/components/schemas/Payment"
+        checkout_url:
+          type: string
+          format: uri
+          description: HaitiPay-hosted checkout
+        provider_checkout_url:
+          type: string
+          format: uri
+          description: Provider's own checkout (e.g. MonCash)
+        idempotent:
+          type: boolean
+
+    VerifyPaymentInput:
+      type: object
+      oneOf:
+        - required: [payment_id]
+        - required: [order_id]
+        - required: [transaction_id]
+      properties:
+        payment_id: { type: string, format: uuid }
+        order_id: { type: string }
+        transaction_id: { type: string }
+
+    CreateRefundInput:
+      type: object
+      properties:
+        payment_id: { type: string, format: uuid }
+        order_id: { type: string }
+        amount:
+          type: number
+          format: float
+          minimum: 0.01
+          description: Omit to refund the remaining balance
+        reason: { type: string }
+        merchant_refund_id:
+          type: string
+          description: For idempotency
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Refund:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        payment_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [created, pending, succeeded, failed, canceled]
+        amount: { type: string }
+        currency: { $ref: "#/components/schemas/Currency" }
+        reason: { type: string, nullable: true }
+        merchant_refund_id: { type: string, nullable: true }
+        provider_refund_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        processed_at: { type: string, format: date-time, nullable: true }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ProviderError:
+      description: Provider call failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

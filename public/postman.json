@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "HaitiPay Gateway API",
+    "_postman_id": "9a3b1b2f-2b14-4f3a-8b25-haitipay-api-001",
+    "description": "Collection for the HaitiPay payment gateway. Set `apiKey` and `baseUrl` as collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{apiKey}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://ohymckfsvkvvshexwuun.functions.supabase.co",
+      "type": "string"
+    },
+    { "key": "apiKey", "value": "sk_test_REPLACE_ME", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/create-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["create-payment"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"currency\": \"HTG\",\n  \"orderId\": \"ORDER-1001\",\n  \"provider\": \"moncash\",\n  \"customer\": { \"email\": \"buyer@example.com\" },\n  \"description\": \"Friday meal\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify payment (by payment_id)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/verify-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["verify-payment"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_id\": \"<uuid>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify payment (by order_id)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/verify-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["verify-payment"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"ORDER-1001\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Refunds",
+      "item": [
+        {
+          "name": "Create refund (partial)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/create-refund",
+              "host": ["{{baseUrl}}"],
+              "path": ["create-refund"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_id\": \"<uuid>\",\n  \"amount\": 100,\n  \"reason\": \"customer request\",\n  \"merchant_refund_id\": \"rf_internal_42\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create refund (full remaining)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/create-refund",
+              "host": ["{{baseUrl}}"],
+              "path": ["create-refund"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_id\": \"<uuid>\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

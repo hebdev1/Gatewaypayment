@@ -1,0 +1,44 @@
+{
+  "name": "@haitipay/node",
+  "version": "0.1.0",
+  "description": "Official Node.js / TypeScript SDK for the HaitiPay payment gateway",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json"
+  },
+  "keywords": [
+    "haitipay",
+    "moncash",
+    "natcash",
+    "haiti",
+    "payment",
+    "gateway",
+    "fintech"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "homepage": "https://gatewaypayment.vercel.app/docs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hebdev1/Gatewaypayment.git",
+    "directory": "packages/node-sdk"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
