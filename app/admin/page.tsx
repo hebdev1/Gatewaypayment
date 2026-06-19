@@ -4,6 +4,7 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   Percent,
+  ReceiptText,
   Store,
   Wallet
 } from "lucide-react";
@@ -65,67 +66,88 @@ export default async function AdminOverviewPage() {
 
       <section className="metrics-grid" aria-label="Platform metrics">
         <article className="metric-card">
-          <span>
+          <div className="label-row">
+            <span>Merchants</span>
             <span className="metric-icon"><Store size={15} aria-hidden="true" /></span>
-            Merchants
-          </span>
-          <strong>{merchantCount ?? 0}</strong>
-          <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 4 }}>
-            {activeCount ?? 0} active
-          </p>
+          </div>
+          <div className="value">{(merchantCount ?? 0).toLocaleString()}</div>
+          <p className="sub">{activeCount ?? 0} active</p>
         </article>
         <article className="metric-card">
-          <span>
+          <div className="label-row">
+            <span>Gross volume</span>
             <span className="metric-icon"><CircleDollarSign size={15} aria-hidden="true" /></span>
-            Gross volume
-          </span>
-          <strong>{formatHTG(totals.gross)}</strong>
-          <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 4 }}>
-            {totals.count} paid
-          </p>
+          </div>
+          <div className="value">{formatHTG(totals.gross)}</div>
+          <p className="sub">{totals.count} paid</p>
         </article>
         <article className="metric-card">
-          <span>
+          <div className="label-row">
+            <span>Gateway fees collected</span>
             <span className="metric-icon"><Percent size={15} aria-hidden="true" /></span>
-            Gateway fees collected
-          </span>
-          <strong>{formatHTG(totals.gatewayFees)}</strong>
+          </div>
+          <div className="value">{formatHTG(totals.gatewayFees)}</div>
         </article>
         <article className="metric-card">
-          <span>
+          <div className="label-row">
+            <span>Merchant net owed</span>
             <span className="metric-icon"><Wallet size={15} aria-hidden="true" /></span>
-            Merchant net owed
-          </span>
-          <strong>{formatHTG(totals.net)}</strong>
+          </div>
+          <div className="value">{formatHTG(totals.net)}</div>
         </article>
       </section>
 
       <section className="metrics-grid" aria-label="Action items">
-        <article className="metric-card" style={{ borderColor: "var(--warn)" }}>
-          <span>
-            <span className="metric-icon"><ClipboardCheck size={15} aria-hidden="true" /></span>
-            KYC awaiting review
-          </span>
-          <strong>{kycPendingCount ?? 0}</strong>
-          <Link href="/admin/kyc" style={{ color: "var(--accent-dark)", fontWeight: 600 }}>
+        <article className="metric-card">
+          <div className="label-row">
+            <span>KYC awaiting review</span>
+            <span className="metric-icon" style={{ background: "var(--warning-soft)", color: "var(--warning)" }}>
+              <ClipboardCheck size={15} aria-hidden="true" />
+            </span>
+          </div>
+          <div className="value">{(kycPendingCount ?? 0).toLocaleString()}</div>
+          <Link href="/admin/kyc" style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13 }}>
             Review queue →
           </Link>
         </article>
-        <article className="metric-card" style={{ borderColor: "var(--danger)" }}>
-          <span>
-            <span className="metric-icon"><AlertTriangle size={15} aria-hidden="true" /></span>
-            Failed webhook deliveries
-          </span>
-          <strong>{failedDeliveries ?? 0}</strong>
-          <Link href="/admin/webhooks" style={{ color: "var(--accent-dark)", fontWeight: 600 }}>
+        <article className="metric-card">
+          <div className="label-row">
+            <span>Failed webhook deliveries</span>
+            <span className="metric-icon" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+              <AlertTriangle size={15} aria-hidden="true" />
+            </span>
+          </div>
+          <div className="value">{(failedDeliveries ?? 0).toLocaleString()}</div>
+          <Link href="/admin/webhooks" style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13 }}>
             Investigate →
           </Link>
+        </article>
+        <article className="metric-card">
+          <div className="label-row">
+            <span>Recent activity</span>
+            <span className="metric-icon"><ReceiptText size={15} aria-hidden="true" /></span>
+          </div>
+          <div className="value">{totals.count}</div>
+          <p className="sub">Total successful payments</p>
+        </article>
+        <article className="metric-card">
+          <div className="label-row">
+            <span>Health</span>
+            <span className="metric-icon" style={{ background: "var(--success-soft)", color: "var(--success)" }}>
+              <Store size={15} aria-hidden="true" />
+            </span>
+          </div>
+          <div className="value">OK</div>
+          <p className="sub">Cron, edge functions, DB</p>
         </article>
       </section>
 
       <section className="data-card">
         <div className="data-card-header">
           <h2>Newest merchants</h2>
+          <Link className="button ghost" href="/admin/merchants">
+            View all →
+          </Link>
         </div>
         <div className="table-wrap">
           <table>

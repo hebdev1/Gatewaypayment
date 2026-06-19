@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   ClipboardCheck,
   LayoutDashboard,
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
 import { requireAdmin } from "@/lib/admin";
+import { NavLink } from "@/app/dashboard/nav-link";
 
 export default async function AdminLayout({
   children
@@ -30,34 +30,39 @@ export default async function AdminLayout({
             <span className="brand-meta">{admin.role} · {admin.email}</span>
           </span>
         </div>
+
+        <p className="nav-section-label">Operations</p>
         <nav className="nav-list" aria-label="Admin">
-          <Link className="nav-link" href="/admin">
-            <LayoutDashboard size={17} aria-hidden="true" />
+          <NavLink href="/admin" exact>
+            <LayoutDashboard size={16} aria-hidden="true" />
             Overview
-          </Link>
-          <Link className="nav-link" href="/admin/merchants">
-            <Store size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/admin/merchants">
+            <Store size={16} aria-hidden="true" />
             Merchants
-          </Link>
-          <Link className="nav-link" href="/admin/kyc">
-            <ClipboardCheck size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/admin/kyc">
+            <ClipboardCheck size={16} aria-hidden="true" />
             KYC queue
-          </Link>
-          <Link className="nav-link" href="/admin/payments">
-            <ReceiptText size={17} aria-hidden="true" />
+          </NavLink>
+
+          <p className="nav-section-label">Activity</p>
+          <NavLink href="/admin/payments">
+            <ReceiptText size={16} aria-hidden="true" />
             Payments
-          </Link>
-          <Link className="nav-link" href="/admin/webhooks">
-            <RadioTower size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/admin/webhooks">
+            <RadioTower size={16} aria-hidden="true" />
             Webhook deliveries
-          </Link>
-          <form action={signOutAction} className="sidebar-footer">
-            <button className="nav-button" type="submit">
-              <LogOut size={17} aria-hidden="true" />
-              Sign out
-            </button>
-          </form>
+          </NavLink>
         </nav>
+
+        <form action={signOutAction} className="sidebar-footer">
+          <button className="nav-button" type="submit">
+            <LogOut size={16} aria-hidden="true" />
+            Sign out
+          </button>
+        </form>
       </aside>
       <main className="main">{children}</main>
     </div>

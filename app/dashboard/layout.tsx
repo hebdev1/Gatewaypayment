@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   CreditCard,
   Home,
@@ -13,9 +12,9 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireUserId } from "@/lib/auth";
+import { requireMerchant, requireUserId } from "@/lib/auth";
 import { signOutAction } from "@/app/login/actions";
-import { requireMerchant } from "@/lib/auth";
+import { NavLink } from "./nav-link";
 
 export default async function DashboardLayout({
   children
@@ -46,49 +45,56 @@ export default async function DashboardLayout({
           </span>
           <span className="brand-copy">
             <span className="brand-name">{merchant.display_name}</span>
-            <span className="brand-meta">{merchant.default_currency} settlement</span>
+            <span className="brand-meta">{merchant.default_currency} · {merchant.live_enabled ? "Live + sandbox" : "Sandbox"}</span>
           </span>
         </div>
+
+        <p className="nav-section-label">Overview</p>
         <nav className="nav-list" aria-label="Merchant">
-          <Link className="nav-link" href="/dashboard">
-            <Home size={17} aria-hidden="true" />
+          <NavLink href="/dashboard" exact>
+            <Home size={16} aria-hidden="true" />
             Dashboard
-          </Link>
-          <Link className="nav-link" href="/dashboard/payments">
-            <ReceiptText size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/dashboard/payments">
+            <ReceiptText size={16} aria-hidden="true" />
             Payments
-          </Link>
-          <Link className="nav-link" href="/dashboard/refunds">
-            <RotateCcw size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/dashboard/refunds">
+            <RotateCcw size={16} aria-hidden="true" />
             Refunds
-          </Link>
-          <Link className="nav-link" href="/dashboard/api-keys">
-            <KeyRound size={17} aria-hidden="true" />
+          </NavLink>
+
+          <p className="nav-section-label">Developer</p>
+          <NavLink href="/dashboard/api-keys">
+            <KeyRound size={16} aria-hidden="true" />
             API keys
-          </Link>
-          <Link className="nav-link" href="/dashboard/provider-settings">
-            <Settings size={17} aria-hidden="true" />
-            Providers
-          </Link>
-          <Link className="nav-link" href="/dashboard/webhooks">
-            <RadioTower size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/dashboard/webhooks">
+            <RadioTower size={16} aria-hidden="true" />
             Webhooks
-          </Link>
-          <Link className="nav-link" href="/dashboard/kyc">
-            <ShieldCheck size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/dashboard/provider-settings">
+            <Settings size={16} aria-hidden="true" />
+            Providers
+          </NavLink>
+
+          <p className="nav-section-label">Account</p>
+          <NavLink href="/dashboard/kyc">
+            <ShieldCheck size={16} aria-hidden="true" />
             KYC
-          </Link>
-          <Link className="nav-link" href="/dashboard/settings">
-            <UserCog size={17} aria-hidden="true" />
+          </NavLink>
+          <NavLink href="/dashboard/settings">
+            <UserCog size={16} aria-hidden="true" />
             Settings
-          </Link>
-          <form action={signOutAction} className="sidebar-footer">
-            <button className="nav-button" type="submit">
-              <LogOut size={17} aria-hidden="true" />
-              Sign out
-            </button>
-          </form>
+          </NavLink>
         </nav>
+
+        <form action={signOutAction} className="sidebar-footer">
+          <button className="nav-button" type="submit">
+            <LogOut size={16} aria-hidden="true" />
+            Sign out
+          </button>
+        </form>
       </aside>
       <main className="main">{children}</main>
     </div>
