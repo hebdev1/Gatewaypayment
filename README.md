@@ -257,6 +257,33 @@ hosting. You need a Hostinger plan that supports Node.js (VPS or Cloud Hosting).
 - [ ] An inbound provider-webhook token generated and configured in MonCash
 - [ ] `pg_cron` job `dispatch-webhooks-tick` is `active = true` in `cron.job`
 
+## Sprint 1.1 — what's new
+
+The codebase now ships with rate limiting, transactional emails, 2FA,
+and a public status page. Before they work end-to-end you need to:
+
+1. **Sign up for Resend** (https://resend.com) and verify a domain you
+   own. Free tier = 3,000 emails / month.
+2. In **Supabase → Edge Function Secrets**, add:
+   - `RESEND_API_KEY` = your Resend API key
+   - `EMAIL_FROM` = `HaitiPay <noreply@yourdomain.com>` (must match the
+     verified domain)
+   - `EMAIL_SENDER_SECRET` = read it once from the Vault:
+     `select decrypted_secret from vault.decrypted_secrets where name = 'email_sender_secret';`
+3. (Optional) Add `API_RATE_LIMIT_PER_MINUTE` to override the default
+   60 requests/min/key.
+4. In **Supabase → Authentication → URL Configuration**, add
+   `/login/mfa` to the additional Redirect URLs allow-list if you use
+   email confirmation flows.
+
+After step 2, the merchant gets an automatic HTML email whenever a
+payment becomes `succeeded`. The status page at `/status` shows live
+health of Postgres, payments API, webhook delivery, and email queue.
+
+Two-factor authentication is opt-in per merchant at
+`/dashboard/settings/security`. Once enrolled, a 6-digit TOTP code is
+required at every login.
+
 ## Security posture
 
 - API keys are SHA-256 hashed before storage; the plaintext is shown once.

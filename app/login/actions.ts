@@ -28,6 +28,13 @@ export async function signInAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
+  // If this user enrolled a 2FA factor, force them to AAL2 before letting
+  // them into the dashboard.
+  const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aalData && aalData.nextLevel === "aal2" && aalData.currentLevel === "aal1") {
+    redirect("/login/mfa");
+  }
+
   const userId = data.user?.id;
   const target = userId ? await routeForUser(userId) : "/dashboard";
   redirect(target);

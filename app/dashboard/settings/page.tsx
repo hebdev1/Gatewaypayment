@@ -161,6 +161,9 @@ export default async function SettingsPage({
       <section className="data-card">
         <div className="data-card-header">
           <h2><KeyRound size={16} aria-hidden="true" /> Change password</h2>
+          <a className="button ghost" href="/dashboard/settings/security">
+            Two-factor authentication →
+          </a>
         </div>
         <form action={updatePasswordAction} className="stack" style={{ padding: 16, maxWidth: 480 }}>
           {params.password ? <p className="notice">Password updated.</p> : null}

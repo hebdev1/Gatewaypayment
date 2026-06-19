@@ -29,6 +29,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.9
+    },
+    {
+      url: `${base}/status`,
+      lastModified: now,
+      changeFrequency: "hourly",
+      priority: 0.4
     }
   ];
 }
