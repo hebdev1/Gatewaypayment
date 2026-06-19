@@ -1,7 +1,9 @@
 import {
   CreditCard,
+  FileText,
   Home,
   KeyRound,
+  Link2,
   LogOut,
   RadioTower,
   ReceiptText,
@@ -62,6 +64,14 @@ export default async function DashboardLayout({
           <NavLink href="/dashboard/refunds">
             <RotateCcw size={16} aria-hidden="true" />
             Refunds
+          </NavLink>
+          <NavLink href="/dashboard/links">
+            <Link2 size={16} aria-hidden="true" />
+            Payment links
+          </NavLink>
+          <NavLink href="/dashboard/invoices">
+            <FileText size={16} aria-hidden="true" />
+            Invoices
           </NavLink>
 
           <p className="nav-section-label">Developer</p>
