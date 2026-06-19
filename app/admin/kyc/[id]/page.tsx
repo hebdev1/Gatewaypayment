@@ -10,7 +10,16 @@ type KycSubmission = {
   merchant_id: string;
   status: string;
   business_data: Record<string, string>;
-  document_urls: string[];
+  document_urls: Array<
+    | string
+    | {
+        name: string;
+        storage_path: string;
+        content_type: string;
+        size: number;
+        uploaded_at: string;
+      }
+  >;
   submitted_at: string | null;
   reviewed_at: string | null;
   notes: string | null;
@@ -106,17 +115,48 @@ export default async function AdminKycReviewPage({
         <div className="data-card-header">
           <h2>Documents ({docs.length})</h2>
         </div>
-        <ul style={{ padding: 16, listStyle: "disc inside", color: "var(--ink-soft)" }}>
+        <ul style={{ padding: 16, color: "var(--text-secondary)" }}>
           {docs.length === 0 ? (
             <li className="empty">No documents provided.</li>
           ) : (
-            docs.map((url, i) => (
-              <li key={i}>
-                <a href={url} className="mono" target="_blank" rel="noreferrer">
-                  {url}
-                </a>
-              </li>
-            ))
+            docs.map((doc, i) => {
+              if (typeof doc === "string") {
+                return (
+                  <li key={i} style={{ marginBottom: 6 }}>
+                    <a href={doc} className="mono" target="_blank" rel="noreferrer">
+                      {doc}
+                    </a>
+                  </li>
+                );
+              }
+              const href = `/api/kyc/document?path=${encodeURIComponent(doc.storage_path)}`;
+              return (
+                <li
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "8px 0",
+                    borderBottom: "1px solid var(--divider)"
+                  }}
+                >
+                  <span>
+                    <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 600 }}>
+                      {doc.name}
+                    </a>
+                    <span style={{ color: "var(--text-tertiary)", fontSize: 12, marginLeft: 8 }}>
+                      {doc.content_type} ·{" "}
+                      {doc.size < 1024 * 1024
+                        ? `${(doc.size / 1024).toFixed(1)} KB`
+                        : `${(doc.size / (1024 * 1024)).toFixed(1)} MB`}
+                    </span>
+                  </span>
+                  <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+                    {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : ""}
+                  </span>
+                </li>
+              );
+            })
           )}
         </ul>
       </section>

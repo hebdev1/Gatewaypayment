@@ -57,6 +57,14 @@ export default async function RefundsListPage({
           <p className="eyebrow">Activity</p>
           <h1>Refunds</h1>
         </div>
+        <div className="topbar-actions">
+          <a
+            className="button secondary"
+            href={`/api/exports/refunds${status ? `?status=${status}` : ""}`}
+          >
+            Export CSV
+          </a>
+        </div>
       </header>
 
       <section className="data-card">

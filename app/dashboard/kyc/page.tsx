@@ -1,18 +1,33 @@
-import { ShieldCheck } from "lucide-react";
+import { FileText, ShieldCheck, Trash2 } from "lucide-react";
 import { requireMerchant } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { saveDraftAction, submitKycAction } from "./actions";
+import { removeKycDocumentAction, saveDraftAction, submitKycAction } from "./actions";
+
+type StoredDocument = {
+  name: string;
+  storage_path: string;
+  content_type: string;
+  size: number;
+  uploaded_at: string;
+};
 
 type Submission = {
   id: string;
   status: "not_started" | "draft" | "submitted" | "approved" | "rejected";
   business_data: Record<string, string>;
-  document_urls: string[];
+  document_urls: StoredDocument[];
   submitted_at: string | null;
   reviewed_at: string | null;
   notes: string | null;
   created_at: string;
 };
+
+function formatSize(bytes: number) {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default async function KycPage({
   searchParams
@@ -32,7 +47,9 @@ export default async function KycPage({
 
   const submission = (data ?? null) as Submission | null;
   const business = (submission?.business_data ?? {}) as Record<string, string>;
-  const docs = (submission?.document_urls ?? []) as string[];
+  const docs = Array.isArray(submission?.document_urls)
+    ? (submission!.document_urls as StoredDocument[])
+    : [];
   const locked = submission?.status === "submitted" || submission?.status === "approved";
 
   return (
@@ -42,7 +59,7 @@ export default async function KycPage({
           <p className="eyebrow">Compliance</p>
           <h1>KYC verification</h1>
           <p>
-            Provide your business details to unlock live mode.{" "}
+            Provide your business details and documents to unlock live mode.{" "}
             {merchant.live_enabled
               ? "Live is currently enabled."
               : "Live is locked until KYC is approved."}
@@ -67,18 +84,20 @@ export default async function KycPage({
         </section>
       ) : null}
 
-      <form action={locked ? undefined : submitKycAction} className="form-panel stack">
+      <form
+        action={locked ? undefined : submitKycAction}
+        className="form-panel stack"
+        encType="multipart/form-data"
+      >
         <h2>
           <ShieldCheck size={16} aria-hidden="true" /> Business profile
         </h2>
 
-        {params.saved ? (
-          <p className="notice">Draft saved.</p>
-        ) : null}
+        {params.saved ? <p className="notice">Draft saved.</p> : null}
         {params.submitted ? (
           <p className="notice">Submitted for review. We&apos;ll email you shortly.</p>
         ) : null}
-        {params.error ? <p className="error">{params.error}</p> : null}
+        {params.error ? <p className="error">{decodeURIComponent(params.error)}</p> : null}
 
         <div className="split-grid">
           <div className="field">
@@ -196,17 +215,62 @@ export default async function KycPage({
         </div>
 
         <div className="field">
-          <label htmlFor="document_urls">Supporting document URLs (one per line)</label>
-          <textarea
+          <label htmlFor="documents">Supporting documents (PDF, JPG, PNG; 10 MB max each)</label>
+          <input
             className="input"
-            id="document_urls"
-            name="document_urls"
-            rows={4}
-            placeholder="Links to ID, business registration, RIB, etc."
-            defaultValue={docs.join("\n")}
+            id="documents"
+            name="documents"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             disabled={locked}
           />
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>
+            Upload your business registration, ID, and (if available) bank statement.
+            Documents are stored privately; only the HaitiPay review team can see them.
+          </p>
         </div>
+
+        {docs.length ? (
+          <div className="data-card" style={{ border: 0, boxShadow: "none" }}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Uploaded</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {docs.map((doc) => (
+                    <tr key={doc.storage_path}>
+                      <td>
+                        <FileText size={13} aria-hidden="true" style={{ marginRight: 6, verticalAlign: -2 }} />
+                        {doc.name}
+                      </td>
+                      <td>{doc.content_type?.split("/")[1] ?? "—"}</td>
+                      <td>{formatSize(doc.size)}</td>
+                      <td>{doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleString() : "—"}</td>
+                      <td>
+                        {!locked ? (
+                          <form action={removeKycDocumentAction}>
+                            <input type="hidden" name="path" value={doc.storage_path} />
+                            <button className="button secondary" type="submit">
+                              <Trash2 size={12} aria-hidden="true" /> Remove
+                            </button>
+                          </form>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
 
         <div className="row-actions">
           {!locked ? (

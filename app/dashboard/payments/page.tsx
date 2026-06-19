@@ -92,6 +92,17 @@ export default async function PaymentsListPage({
           <p className="eyebrow">Activity</p>
           <h1>Payments</h1>
         </div>
+        <div className="topbar-actions">
+          <a
+            className="button secondary"
+            href={`/api/exports/payments?${new URLSearchParams({
+              ...(status ? { status } : {}),
+              ...(mode ? { mode } : {})
+            }).toString()}`}
+          >
+            Export CSV
+          </a>
+        </div>
       </header>
 
       <section className="data-card">
