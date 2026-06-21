@@ -55,6 +55,10 @@ export default async function AdminLayout({
             <RadioTower size={16} aria-hidden="true" />
             Webhook deliveries
           </NavLink>
+          <NavLink href="/admin/payouts">
+            <ReceiptText size={16} aria-hidden="true" />
+            Payouts queue
+          </NavLink>
         </nav>
 
         <form action={signOutAction} className="sidebar-footer">

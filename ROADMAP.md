@@ -9,11 +9,27 @@ sprint is 2 weeks.
 
 ---
 
-## Snapshot today
+## Snapshot today (2026-06-20)
 
 | Solid | Basic | Missing |
 |---|---|---|
-| Auth, KYC, API, webhooks, refunds, admin panel, audit log, settings | MonCash only, HTG only, EN only, hosted checkout simple | Payouts, NatCash, cards, subscriptions, SDKs, plugins, fraud detection, 3DS, multi-currency, i18n, payment links, QR codes |
+| Auth + 2FA TOTP, KYC + Storage uploads, API + rate limiting, webhooks signed + scheduler, refunds, admin panel + audit log, settings + team, payment links + QR + invoices, multi-currency (HTG/USD/EUR/CAD/DOP), email outbox + Resend, Node SDK + OpenAPI + Postman, status page, i18n FR/HT/EN infra + 3 pages, **Settlement (Model A) payouts** | MonCash provider only, EN-only dashboard, hosted checkout simple, only customer-facing pages translated | NatCash adapter, cards/3DS, Apple/Google Pay, marketplace/Connect, subscriptions, WooCommerce plugin, automated fraud rules, 6 remaining public pages to translate, Sentry/observability |
+
+## ⚠️ Architectural pivot — Settlement (Model A)
+
+On 2026-06-20 the project moved from per-merchant MonCash credentials
+("merchant collects, HaitiPay invoices") to a **Settlement** model:
+
+- Customer pays via HaitiPay master MonCash account (env vars
+  `HAITIPAY_MONCASH_*`)
+- HaitiPay automatically retains 2.5% gateway fee in its master wallet
+- HaitiPay pays merchants their net via `/v1/Transfert` on a per-merchant
+  schedule (daily / weekly / monthly)
+- Admin can manually mark stuck payouts as paid (bank wire, cash pickup)
+
+This replaces the abandoned Fee Collection (Model C) brainstorm and the
+original per-merchant provider credential flow. The
+`payment_provider_credentials` table is kept as a legacy fallback.
 
 ---
 

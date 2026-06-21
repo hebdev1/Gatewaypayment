@@ -3,12 +3,12 @@ import {
   FileText,
   Home,
   KeyRound,
+  Landmark,
   Link2,
   LogOut,
   RadioTower,
   ReceiptText,
   RotateCcw,
-  Settings,
   ShieldCheck,
   UserCog
 } from "lucide-react";
@@ -73,6 +73,10 @@ export default async function DashboardLayout({
             <FileText size={16} aria-hidden="true" />
             Invoices
           </NavLink>
+          <NavLink href="/dashboard/payouts">
+            <Landmark size={16} aria-hidden="true" />
+            Payouts
+          </NavLink>
 
           <p className="nav-section-label">Developer</p>
           <NavLink href="/dashboard/api-keys">
@@ -82,10 +86,6 @@ export default async function DashboardLayout({
           <NavLink href="/dashboard/webhooks">
             <RadioTower size={16} aria-hidden="true" />
             Webhooks
-          </NavLink>
-          <NavLink href="/dashboard/provider-settings">
-            <Settings size={16} aria-hidden="true" />
-            Providers
           </NavLink>
 
           <p className="nav-section-label">Account</p>
