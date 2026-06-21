@@ -21,7 +21,7 @@ export async function enrollTotpAction(): Promise<{
   // Clean up any previous unverified factors
   const { data: existing } = await supabase.auth.mfa.listFactors();
   for (const f of existing?.totp ?? []) {
-    if (f.status === "unverified") {
+    if ((f.status as string) !== "verified") {
       await supabase.auth.mfa.unenroll({ factorId: f.id });
     }
   }
