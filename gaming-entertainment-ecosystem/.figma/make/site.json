@@ -1,0 +1,10 @@
+{
+  "description": "A gaming marketplace for players to buy top-ups, gift cards, subscriptions, and digital game content, with a trusted, convenient experience for Haiti and the Caribbean.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
