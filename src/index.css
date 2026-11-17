@@ -169,6 +169,12 @@ footer { background: #0a0b0c; color: var(--white); }
 .cart-quantity .button { width: 38px; min-height: 38px; padding: 0; }
 .cart-quantity span { min-width: 2ch; text-align: center; }
 .cart-subtotal { display: flex; justify-content: space-between; gap: 12px; }
+.auth-form label { display: grid; gap: 6px; font-weight: 600; }
+.auth-form input { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+.account-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; overflow-wrap: anywhere; }
+.shop-dialog [role="status"] { overflow-wrap: anywhere; }
+.orders-list > li { padding-block: 10px; border-block-start: 1px solid var(--line); }
+.orders-list time, .orders-list ul { color: var(--muted); font-size: 13px; }
 
 @media (max-width: 950px) {
   .container { width: min(100% - 32px, 760px); }
