@@ -12,7 +12,7 @@ The migration in `supabase/migrations` defines the catalog, orders, permissions,
 
 ## Deploy
 
-The existing GitHub Pages URL is `https://hebdev1.github.io/Gatewaypayment/`. Build from the repository root with `pnpm exec vite build --base=/Gatewaypayment/` and deploy the contents of `dist/`. For another host or path, adjust the Vite base.
+GitHub Pages serves the marketplace at `https://hebdev1.github.io/Gatewaypayment/store/` from the `store/` directory on `main`. Build from the repository root with `pnpm exec vite build --base=/Gatewaypayment/store/` and replace the contents of `store/` with the contents of `dist/` in each release commit. For another host or path, adjust the Vite base.
 
 In Supabase Auth, set the Site URL to the public site URL. Add the local development URL to the allowed redirect URLs for testing. Configure production SMTP before opening email registration to customers.
 
