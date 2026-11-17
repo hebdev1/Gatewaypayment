@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { AccountPanel } from './AccountPanel'
+import { fetchOrders, fetchProducts, formatPrice, supabase, type Order, type Product } from './store'
 
 type IconName =
   | 'arrow'
@@ -40,17 +43,6 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>
 }
 
-const products = [
-  { id: 'free-fire', name: 'Free Fire', type: 'Diamonds', mark: 'FF', tone: 'orange', price: 105, tag: 'Hot' },
-  { id: 'pubg-mobile', name: 'PUBG Mobile', type: 'UC', mark: 'P', tone: 'gold', price: 99, tag: 'Best seller' },
-  { id: 'call-of-duty', name: 'Call of Duty', type: 'CP', mark: 'COD', tone: 'silver', price: 149, tag: '' },
-  { id: 'mobile-legends', name: 'Mobile Legends', type: 'Diamonds', mark: 'ML', tone: 'blue', price: 115, tag: '−5%' },
-  { id: 'roblox', name: 'Roblox', type: 'Robux', mark: 'R', tone: 'red', price: 499, tag: '' },
-  { id: 'valorant', name: 'Valorant', type: 'Points', mark: 'V', tone: 'coral', price: 500, tag: 'New' },
-  { id: 'steam', name: 'Steam', type: 'Wallet', mark: 'S', tone: 'navy', price: 500, tag: '' },
-  { id: 'playstation', name: 'PlayStation', type: 'Gift card', mark: 'PS', tone: 'royal', price: 1000, tag: '' },
-]
-
 const categories = [
   { label: 'Top-ups', detail: 'Instant game credit', icon: 'bolt' as IconName },
   { label: 'Gift cards', detail: 'Global & regional', icon: 'gift' as IconName },
@@ -58,25 +50,17 @@ const categories = [
   { label: 'Subscriptions', detail: 'Play without limits', icon: 'spark' as IconName },
 ] as const
 
-type Product = (typeof products)[number]
 type Category = 'All' | (typeof categories)[number]['label']
 type Cart = Partial<Record<string, number>>
 
 const cartStorageKey = 'gaming-entertainment-ecosystem.cart'
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const formatPrice = (cents: number) => usd.format(cents / 100)
-const productCategory = (product: Product) =>
-  product.type === 'Gift card' || product.type === 'Wallet' ? 'Gift cards' : 'Top-ups'
 
 function loadCart(): Cart {
   try {
     const saved = JSON.parse(window.localStorage.getItem(cartStorageKey) ?? '{}') as Cart | null
-    return Object.fromEntries(products.flatMap(({ id }) => {
-      const quantity = saved?.[id]
-      return typeof quantity === 'number' && Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 99
-        ? [[id, quantity]]
-        : []
-    }))
+    return Object.fromEntries(Object.entries(saved ?? {}).filter(([, quantity]) =>
+      typeof quantity === 'number' && Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 99
+    ))
   } catch {
     return {}
   }
@@ -104,10 +88,48 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cart, setCart] = useState(loadCart)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>(supabase ? 'loading' : 'error')
+  const [catalogRefresh, setCatalogRefresh] = useState(0)
+  const [session, setSession] = useState<Session | null>(null)
+  const [orders, setOrders] = useState<{ owner: string; list: Order[]; error: boolean } | null>(null)
+  const [orderRefresh, setOrderRefresh] = useState(0)
+  const [orderState, setOrderState] = useState<'idle' | 'saving' | 'error'>('idle')
+  const [createdOrder, setCreatedOrder] = useState<{ owner: string; id: string } | null>(null)
+  const orderRequest = useRef<{ owner: string; cart: string; id: string } | null>(null)
+  const orderInFlight = useRef(false)
   const searchInput = useRef<HTMLInputElement>(null)
   const marketplace = useRef<HTMLElement>(null)
   const cartDialog = useRef<HTMLDialogElement>(null)
   const productDialog = useRef<HTMLDialogElement>(null)
+  const accountDialog = useRef<HTMLDialogElement>(null)
+  const userId = session?.user.id
+
+  useEffect(() => {
+    if (!supabase) return
+    const controller = new AbortController()
+    void fetchProducts(supabase).abortSignal(controller.signal).then(({ data, error }) => {
+      if (controller.signal.aborted) return
+      setProducts(data ?? [])
+      setCatalogState(error ? 'error' : 'ready')
+    })
+    return () => controller.abort()
+  }, [catalogRefresh])
+
+  useEffect(() => {
+    if (!supabase) return
+    const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => setSession(currentSession))
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!supabase || !userId) return
+    const controller = new AbortController()
+    void fetchOrders(supabase).abortSignal(controller.signal).then(({ data, error }) => {
+      if (!controller.signal.aborted) setOrders({ owner: userId, list: data ?? [], error: Boolean(error) })
+    })
+    return () => controller.abort()
+  }, [userId, orderRefresh])
 
   useEffect(() => {
     try {
@@ -130,8 +152,8 @@ export default function App() {
 
   const query = search.trim().toLowerCase()
   const filteredProducts = products.filter((product) =>
-    (activeCategory === 'All' || productCategory(product) === activeCategory) &&
-    `${product.name} ${product.type} ${productCategory(product)}`.toLowerCase().includes(query)
+    (activeCategory === 'All' || product.category === activeCategory) &&
+    `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query)
   )
   const cartItems = products.flatMap((product) => {
     const quantity = cart[product.id]
@@ -141,6 +163,8 @@ export default function App() {
   const subtotal = cartItems.reduce((sum, { product, quantity }) => sum + product.price * quantity, 0)
 
   function changeQuantity(id: string, delta: number) {
+    if (orderInFlight.current) return
+    setOrderState('idle')
     setCart((previous) => {
       const quantity = Math.min(99, (previous[id] ?? 0) + delta)
       const updated = { ...previous }
@@ -163,6 +187,59 @@ export default function App() {
     cartDialog.current?.showModal()
   }
 
+  function openAccount() {
+    cartDialog.current?.close()
+    accountDialog.current?.showModal()
+  }
+
+  async function createOrder() {
+    if (!supabase || !userId || !cartItems.length || orderInFlight.current) return
+    orderInFlight.current = true
+    setOrderState('saving')
+    const items = cartItems.map(({ product, quantity }) => ({ product_id: product.id, quantity }))
+      .sort((left, right) => left.product_id.localeCompare(right.product_id))
+    const cartSignature = JSON.stringify(items)
+    const requestKey = `${cartStorageKey}.order.${userId}`
+    try {
+      let request = orderRequest.current?.owner === userId ? orderRequest.current : null
+      try {
+        request ??= JSON.parse(window.sessionStorage.getItem(requestKey) ?? 'null')
+      } catch {
+        // A request can still be retried in the current page.
+      }
+      if (request?.owner !== userId || request.cart !== cartSignature || typeof request.id !== 'string') {
+        request = { owner: userId, cart: cartSignature, id: window.crypto.randomUUID() }
+      }
+      orderRequest.current = request
+      try {
+        window.sessionStorage.setItem(requestKey, JSON.stringify(request))
+      } catch {
+        // Keep the request ID in memory if storage is unavailable.
+      }
+      const { data, error } = await supabase.rpc('create_marketplace_order', { requested_items: items, request_id: request.id })
+      if (error || typeof data !== 'string') {
+        setOrderState('error')
+        return
+      }
+      setCreatedOrder({ owner: userId, id: data })
+      setCart({})
+      orderRequest.current = null
+      try {
+        window.sessionStorage.removeItem(requestKey)
+      } catch {
+        // The order is already recorded.
+      }
+      setOrders(null)
+      setOrderRefresh((value) => value + 1)
+      setOrderState('idle')
+      openAccount()
+    } catch {
+      setOrderState('error')
+    } finally {
+      orderInFlight.current = false
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="nav-wrap">
@@ -177,6 +254,7 @@ export default function App() {
           </div>
           <div className="nav-actions">
             <span className="region-button"><Icon name="globe" size={18} /><span>HT / USD</span></span>
+            <AppButton variant="dark" ariaLabel={session ? 'My account' : 'Sign in'} onClick={openAccount}><Icon name="user" size={18} /><span>{session ? 'My account' : 'Sign in'}</span></AppButton>
             <AppButton variant="icon" ariaLabel={`Open cart (${itemCount} items)`} onClick={() => cartDialog.current?.showModal()}>
               <Icon name="bag" size={20} />
               {itemCount > 0 && <span className="cart-dot" aria-hidden="true">{itemCount > 99 ? '99+' : itemCount}</span>}
@@ -236,7 +314,12 @@ export default function App() {
               <button aria-pressed={activeCategory === filter} className={activeCategory === filter ? 'selected' : ''} key={filter} onClick={() => setActiveCategory(filter)}>{filter}</button>
             ))}
           </div>
-          {filteredProducts.length ? (
+          {catalogState === 'loading' ? <p className="empty-state" role="status">Loading products…</p> : catalogState === 'error' ? (
+            <div className="empty-state" role="status">
+              <p>{supabase ? 'The catalog is temporarily unavailable.' : 'The catalog needs a Supabase connection.'}</p>
+              {supabase && <AppButton onClick={() => { setCatalogState('loading'); setCatalogRefresh((value) => value + 1) }}>Retry</AppButton>}
+            </div>
+          ) : filteredProducts.length ? (
             <div className="product-grid">
               {filteredProducts.map((product) => (
                 <article className="product-card" key={product.id}>
@@ -309,17 +392,36 @@ export default function App() {
                 <li key={product.id}>
                   <div><strong>{product.name}</strong><p>{product.type} · {formatPrice(product.price)} each</p></div>
                   <div className="cart-quantity">
-                    <AppButton variant="ghost" ariaLabel={`Decrease ${product.name} quantity`} onClick={() => changeQuantity(product.id, -1)}>−</AppButton>
+                    <AppButton variant="ghost" ariaLabel={`Decrease ${product.name} quantity`} onClick={() => changeQuantity(product.id, -1)} disabled={orderState === 'saving'}>−</AppButton>
                     <span aria-label={`${product.name} quantity`}>{quantity}</span>
-                    <AppButton variant="ghost" ariaLabel={`Increase ${product.name} quantity`} onClick={() => changeQuantity(product.id, 1)} disabled={quantity === 99}>+</AppButton>
+                    <AppButton variant="ghost" ariaLabel={`Increase ${product.name} quantity`} onClick={() => changeQuantity(product.id, 1)} disabled={quantity === 99 || orderState === 'saving'}>+</AppButton>
                   </div>
                 </li>
               ))}
             </ul>
             <p className="cart-subtotal" aria-live="polite"><strong>Estimated subtotal</strong><strong>{formatPrice(subtotal)} USD</strong></p>
-            <p className="cart-status">Checkout is coming soon.</p>
+            <p className="cart-status">You can save your order now. Online payment is unavailable.</p>
+            {orderState === 'error' && <p role="alert">We could not confirm your order. Try again or check your order history.</p>}
+            {session
+              ? <AppButton onClick={() => void createOrder()} disabled={orderState === 'saving'}>{orderState === 'saving' ? 'Saving order…' : 'Save order'}</AppButton>
+              : <AppButton onClick={openAccount} disabled={!supabase}>Sign in to save your order</AppButton>}
           </div>
         )}
+      </dialog>
+      <dialog className="shop-dialog" aria-labelledby="account-title" ref={accountDialog}>
+        <div className="shop-dialog-header">
+          <h2 id="account-title">{session ? 'My account' : 'Sign in'}</h2>
+          <AppButton variant="ghost" onClick={() => accountDialog.current?.close()}>Close</AppButton>
+        </div>
+        <AccountPanel
+          key={userId ?? 'guest'}
+          session={session}
+          orders={orders?.owner === userId ? orders ?? undefined : undefined}
+          createdOrder={createdOrder?.owner === userId ? createdOrder?.id : undefined}
+          retry={() => { setOrders(null); setOrderRefresh((value) => value + 1) }}
+          onCart={() => { accountDialog.current?.close(); cartDialog.current?.showModal() }}
+          hasCart={itemCount > 0}
+        />
       </dialog>
     </div>
   )
