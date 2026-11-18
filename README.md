@@ -16,4 +16,8 @@ GitHub Pages serves the marketplace at `https://hebdev1.github.io/Gatewaypayment
 
 In Supabase Auth, set the Site URL to the public site URL. Add the local development URL to the allowed redirect URLs for testing. Configure production SMTP before opening email registration to customers.
 
+## Support requests
+
+Signed-in customers can submit private requests and check their status from the support center. Store operators can review the `support_requests` table in Supabase and move requests from `received` to `in_review` or `resolved`. The storefront shows the status in the customer's account. It does not send email notifications for support requests.
+
 Saved orders start in `awaiting_payment`. The [payment and fulfillment architecture](docs/payments-and-fulfillment.md) defines how to connect providers.
