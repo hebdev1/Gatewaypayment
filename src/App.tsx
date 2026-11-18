@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { AccountPanel } from './AccountPanel'
+import { AccountPanel, PasswordPage } from './AccountPanel'
+import { AboutPage, FaqPage, Page, PrivacyPage, TermsPage } from './InfoPages'
+import { SupportPage } from './SupportPage'
+import { catalogLink, navigate, readRoute } from './routes'
 import { fetchOrders, fetchProducts, formatPrice, supabase, type Order, type Product } from './store'
 
 type IconName =
@@ -70,28 +73,32 @@ function AppButton({ children, variant = 'primary', onClick, ariaLabel, expanded
   return <button type="button" className={`button button-${variant}`} onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} disabled={disabled}>{children}</button>
 }
 
-function SectionTitle({ eyebrow, title, onBrowse }: { eyebrow: string; title: string; onBrowse: () => void }) {
+function ProductArt({ product }: { product: Product }) {
   return (
-    <div className="section-title">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h2>{title}</h2>
-      </div>
-      <button className="text-link" onClick={onBrowse}>Browse all products<Icon name="arrow" size={17} /></button>
-    </div>
+    <>
+      <span className={`art-bg tone-${product.tone}`} />
+      <span className="art-noise" />
+      <strong>{product.mark}</strong>
+      {product.tag && <span className="product-tag">{product.tag}</span>}
+    </>
   )
 }
 
+function routeCategory(value: string | null): Category {
+  return categories.find((category) => category.label === value)?.label ?? 'All'
+}
+
 export default function App() {
-  const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState<Category>('All')
+  const [route, setRoute] = useState(readRoute)
+  const [search, setSearch] = useState(() => route.params.get('q') ?? '')
+  const activeCategory = routeCategory(route.params.get('category'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cart, setCart] = useState(loadCart)
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>(supabase ? 'loading' : 'error')
   const [catalogRefresh, setCatalogRefresh] = useState(0)
   const [session, setSession] = useState<Session | null>(null)
+  const [authReady, setAuthReady] = useState(!supabase)
   const [orders, setOrders] = useState<{ owner: string; list: Order[]; error: boolean } | null>(null)
   const [orderRefresh, setOrderRefresh] = useState(0)
   const [orderState, setOrderState] = useState<'idle' | 'saving' | 'error'>('idle')
@@ -99,11 +106,43 @@ export default function App() {
   const orderRequest = useRef<{ owner: string; cart: string; id: string } | null>(null)
   const orderInFlight = useRef(false)
   const searchInput = useRef<HTMLInputElement>(null)
-  const marketplace = useRef<HTMLElement>(null)
-  const cartDialog = useRef<HTMLDialogElement>(null)
-  const productDialog = useRef<HTMLDialogElement>(null)
-  const accountDialog = useRef<HTMLDialogElement>(null)
+  const focusSearchAfterNavigation = useRef(false)
+  const main = useRef<HTMLElement>(null)
   const userId = session?.user.id
+  const onHome = route.path === '/'
+  const product = route.path.startsWith('/product/')
+    ? products.find((item) => item.id === route.path.slice('/product/'.length))
+    : undefined
+
+  useEffect(() => {
+    function readHash() {
+      const next = readRoute()
+      setRoute(next)
+      setSearch(next.params.get('q') ?? '')
+      setMobileOpen(false)
+    }
+    window.addEventListener('hashchange', readHash)
+    return () => window.removeEventListener('hashchange', readHash)
+  }, [])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    if (focusSearchAfterNavigation.current && route.path === '/catalog') {
+      focusSearchAfterNavigation.current = false
+      searchInput.current?.focus({ preventScroll: true })
+    } else {
+      main.current?.focus({ preventScroll: true })
+    }
+  }, [route.path])
+
+  useEffect(() => {
+    const title = product?.name ?? ({
+      '/catalog': 'Catalog', '/cart': 'Your cart', '/account': 'My account',
+      '/account/password': 'Change password', '/support': 'Support center',
+      '/faq': 'FAQ', '/about': 'About', '/privacy': 'Privacy notice', '/terms': 'Storefront terms',
+    } as Record<string, string>)[route.path]
+    document.title = title ? `${title} | Gaming Entertainment Ecosystem` : 'Gaming Entertainment Ecosystem'
+  }, [route.path, product?.name])
 
   useEffect(() => {
     if (!supabase) return
@@ -118,7 +157,11 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return
-    const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => setSession(currentSession))
+    const { data } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setSession(currentSession)
+      setAuthReady(true)
+      if (event === 'PASSWORD_RECOVERY') navigate('#/account/password')
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -141,9 +184,13 @@ export default function App() {
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        searchInput.current?.focus()
+        if (searchInput.current) searchInput.current.focus()
+        else {
+          focusSearchAfterNavigation.current = true
+          navigate('#/catalog')
+        }
       }
     }
     window.addEventListener('keydown', focusSearch)
@@ -174,22 +221,9 @@ export default function App() {
     })
   }
 
-  function browse(category: Category = 'All') {
-    setSearch('')
-    setActiveCategory(category)
-    setMobileOpen(false)
-    marketplace.current?.scrollIntoView()
-  }
-
   function addToCart(product: Product) {
     changeQuantity(product.id, 1)
-    productDialog.current?.close()
-    cartDialog.current?.showModal()
-  }
-
-  function openAccount() {
-    cartDialog.current?.close()
-    accountDialog.current?.showModal()
+    navigate('#/cart')
   }
 
   async function createOrder() {
@@ -232,7 +266,7 @@ export default function App() {
       setOrders(null)
       setOrderRefresh((value) => value + 1)
       setOrderState('idle')
-      openAccount()
+      if (readRoute().path === '/cart') navigate('#/account')
     } catch {
       setOrderState('error')
     } finally {
@@ -240,46 +274,107 @@ export default function App() {
     }
   }
 
-  return (
-    <div className="app-shell">
-      <header className="nav-wrap">
-        <nav className="nav container" aria-label="Main navigation">
-          <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Brand home">
-            <span className="brand-mark"><Icon name="gamepad" size={22} /></span>
-            <span>Gaming <b>Ecosystem</b></span>
-          </button>
-          <div className={`nav-links ${mobileOpen ? 'is-open' : ''}`}>
-            <button onClick={() => browse()} className="active">Marketplace</button>
-            <button onClick={() => { setMobileOpen(false); document.getElementById('ecosystem')?.scrollIntoView() }}>Discover</button>
-          </div>
-          <div className="nav-actions">
-            <span className="region-button"><Icon name="globe" size={18} /><span>HT / USD</span></span>
-            <AppButton variant="dark" ariaLabel={session ? 'My account' : 'Sign in'} onClick={openAccount}><Icon name="user" size={18} /><span>{session ? 'My account' : 'Sign in'}</span></AppButton>
-            <AppButton variant="icon" ariaLabel={`Open cart (${itemCount} items)`} onClick={() => cartDialog.current?.showModal()}>
-              <Icon name="bag" size={20} />
-              {itemCount > 0 && <span className="cart-dot" aria-hidden="true">{itemCount > 99 ? '99+' : itemCount}</span>}
-            </AppButton>
-            <AppButton variant="icon" ariaLabel="Toggle menu" expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}><span className="mobile-menu"><Icon name="menu" /></span></AppButton>
-          </div>
-        </nav>
-      </header>
+  const catalogNotice = catalogState === 'loading' ? (
+    <p className="empty-state" role="status">Loading products…</p>
+  ) : catalogState === 'error' ? (
+    <div className="empty-state" role="status">
+      <p>The catalog is temporarily unavailable.</p>
+      {supabase && <AppButton onClick={() => { setCatalogState('loading'); setCatalogRefresh((value) => value + 1) }}>Retry</AppButton>}
+    </div>
+  ) : null
 
-      <main>
+  const productGrid = (items: Product[]) => (
+    <div className="product-grid">
+      {items.map((item) => (
+        <article className="product-card" key={item.id}>
+          <a className="product-art" href={`#/product/${item.id}`} aria-label={`View ${item.name} details`}>
+            <ProductArt product={item} />
+          </a>
+          <div className="product-info">
+            <div><h3><a href={`#/product/${item.id}`}>{item.name}</a></h3><p>{item.type}</p></div>
+            <button className="price-button" aria-label={`Add ${item.name} to cart`} onClick={() => addToCart(item)}>
+              <span>{formatPrice(item.price)}</span><Icon name="chevron" size={16} />
+            </button>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+
+  const cartPage = (
+    <Page title="Your cart" intro="Review your items and save an order to your account.">
+      {catalogNotice ?? (
+        cartItems.length === 0
+          ? <div className="page-copy"><p>Your cart is empty.</p><a className="button button-primary" href="#/catalog">Browse products</a></div>
+          : <div className="page-columns">
+            <div className="page-card">
+              <h2>Items</h2>
+              <ul className="cart-list">
+                {cartItems.map(({ product: item, quantity }) => (
+                  <li key={item.id}>
+                    <div><strong><a href={`#/product/${item.id}`}>{item.name}</a></strong><p>{item.type} · {formatPrice(item.price)} each</p></div>
+                    <div className="cart-quantity">
+                      <AppButton variant="ghost" ariaLabel={`Decrease ${item.name} quantity`} onClick={() => changeQuantity(item.id, -1)} disabled={orderState === 'saving'}>−</AppButton>
+                      <span>{quantity}</span>
+                      <AppButton variant="ghost" ariaLabel={`Increase ${item.name} quantity`} onClick={() => changeQuantity(item.id, 1)} disabled={quantity === 99 || orderState === 'saving'}>+</AppButton>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <a href="#/catalog">Continue browsing</a>
+            </div>
+            <div className="page-card order-summary">
+              <h2>Order summary</h2>
+              <p className="cart-subtotal" aria-live="polite"><strong>Estimated subtotal</strong><strong>{formatPrice(subtotal)} USD</strong></p>
+              <p className="cart-status">Online payment and digital delivery are unavailable. Saving your order does not charge you.</p>
+              {orderState === 'error' && <p role="alert">We could not confirm your order. Try again or check your order history.</p>}
+              {!authReady ? <p role="status">Checking your sign-in…</p> : session
+                ? <AppButton onClick={() => void createOrder()} disabled={orderState === 'saving'}>{orderState === 'saving' ? 'Saving order…' : 'Save order'}</AppButton>
+                : <a className="button button-primary" href="#/account?returnTo=cart">Sign in to save your order</a>}
+            </div>
+          </div>
+      )}
+    </Page>
+  )
+
+  const accountPage = (
+    <Page title={session ? 'My account' : 'Sign in'} intro="Manage your access and find the orders you have saved.">
+      <div className="page-card narrow-card">
+        {route.params.get('password') === 'updated' && session && <p role="status">Your password was updated.</p>}
+        {!authReady ? <p role="status">Checking your sign-in…</p> : <AccountPanel
+          key={userId ?? 'guest'}
+          session={session}
+          orders={orders?.owner === userId ? orders ?? undefined : undefined}
+          createdOrder={createdOrder?.owner === userId ? createdOrder?.id : undefined}
+          retry={() => { setOrders(null); setOrderRefresh((value) => value + 1) }}
+          onCart={() => navigate('#/cart')}
+          hasCart={itemCount > 0}
+          returnTo={route.params.get('returnTo') === 'support' ? 'support' : undefined}
+        />}
+      </div>
+    </Page>
+  )
+
+  let content: ReactNode
+  switch (route.path) {
+    case '/':
+      content = (
+        <>
         <section className="hero">
           <div className="hero-grid container">
             <div className="hero-copy">
               <div className="status-pill"><span /> Built for players, everywhere</div>
               <h1>Your games.<br /><em>One universe.</em></h1>
-              <p>Top up faster, unlock new worlds, and manage everything you play—all from one trusted platform.</p>
-              <form className="hero-search" role="search" onSubmit={(event) => { event.preventDefault(); marketplace.current?.scrollIntoView() }}>
+              <p>Find game credits and gift cards, compare prices in USD and save an order from your account.</p>
+              <form className="hero-search" role="search" onSubmit={(event) => { event.preventDefault(); navigate(catalogLink('All', search)) }}>
                 <Icon name="search" />
-                <input ref={searchInput} value={search} onChange={(event) => { setSearch(event.target.value); setActiveCategory('All') }} placeholder="Search games and gift cards…" aria-label="Search marketplace" aria-keyshortcuts="Control+K Meta+K" />
+                <input ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search games and gift cards…" aria-label="Search marketplace" aria-keyshortcuts="Control+K Meta+K" />
                 <kbd>Ctrl / ⌘ K</kbd>
                 <button className="button button-primary" type="submit">Search</button>
               </form>
             </div>
 
-            <div className="hero-visual" aria-label="Gaming wallet preview">
+            <div className="hero-visual" aria-label="Illustration of a gaming wallet concept">
               <div className="orb orb-one" />
               <div className="orb orb-two" />
               <div className="game-card card-back">
@@ -287,11 +382,11 @@ export default function App() {
               </div>
               <div className="game-card card-front">
                 <div className="card-top"><span className="mini-brand"><Icon name="gamepad" size={15} /></span><span>PLAYER WALLET</span></div>
-                <div className="balance-label">Available balance</div>
+                <div className="balance-label">Example balance</div>
                 <strong>$124.80</strong>
                 <div className="card-bottom"><span>•••• 8042</span><span>VIRTUAL</span></div>
               </div>
-              <div className="floating-chip chip-delivery"><span><Icon name="bolt" size={17} /></span><div><b>Delivered</b><small>+ 1,060 Diamonds</small></div></div>
+              <div className="floating-chip chip-delivery"><span><Icon name="bolt" size={17} /></span><div><b>Delivery concept</b><small>+ 1,060 Diamonds</small></div></div>
               <div className="floating-chip chip-level"><span><Icon name="trophy" size={17} /></span><div><b>Level 08</b><small>2,450 XP earned</small></div></div>
             </div>
           </div>
@@ -299,130 +394,139 @@ export default function App() {
 
         <section className="category-strip container">
           {categories.map((category) => (
-            <button className="category-card" key={category.label} onClick={() => browse(category.label)}>
+            <a className="category-card" key={category.label} href={catalogLink(category.label)}>
               <span className="category-icon"><Icon name={category.icon} /></span>
               <span><b>{category.label}</b><small>{category.detail}</small></span>
               <Icon name="chevron" size={18} />
-            </button>
+            </a>
           ))}
         </section>
 
-        <section className="market-section container" id="popular" ref={marketplace}>
-          <SectionTitle eyebrow="Marketplace" title="Popular right now" onBrowse={() => browse()} />
-          <div className="filter-row" role="group" aria-label="Product categories">
-            {(['All', ...categories.map(({ label }) => label)] as const).map((filter) => (
-              <button aria-pressed={activeCategory === filter} className={activeCategory === filter ? 'selected' : ''} key={filter} onClick={() => setActiveCategory(filter)}>{filter}</button>
-            ))}
-          </div>
-          {catalogState === 'loading' ? <p className="empty-state" role="status">Loading products…</p> : catalogState === 'error' ? (
-            <div className="empty-state" role="status">
-              <p>{supabase ? 'The catalog is temporarily unavailable.' : 'The catalog needs a Supabase connection.'}</p>
-              {supabase && <AppButton onClick={() => { setCatalogState('loading'); setCatalogRefresh((value) => value + 1) }}>Retry</AppButton>}
-            </div>
-          ) : filteredProducts.length ? (
-            <div className="product-grid">
-              {filteredProducts.map((product) => (
-                <article className="product-card" key={product.id}>
-                  <button className="product-art" aria-label={`View ${product.name} details`} onClick={() => { setSelectedProduct(product); productDialog.current?.showModal() }}>
-                    <span className={`art-bg tone-${product.tone}`} />
-                    <span className="art-noise" />
-                    <strong>{product.mark}</strong>
-                    {product.tag && <span className="product-tag">{product.tag}</span>}
-                  </button>
-                  <div className="product-info">
-                    <div><h3>{product.name}</h3><p>{product.type}</p></div>
-                    <button className="price-button" aria-label={`Add ${product.name} to cart`} onClick={() => addToCart(product)}><span>From {formatPrice(product.price)}</span><Icon name="chevron" size={16} /></button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state"><Icon name="search" size={30} /><h3>No products found</h3><p>{query ? 'Try another search or browse all products.' : 'There are no products in this category yet.'}</p><AppButton onClick={() => browse()}>Reset search</AppButton></div>
-          )}
+        <section className="market-section container">
+          <div className="section-title"><h2>Popular right now</h2><a className="text-link" href="#/catalog">Browse all products<Icon name="arrow" size={17} /></a></div>
+          {catalogNotice ?? (products.length ? productGrid(products.slice(0, 4)) : <p>No products are available right now.</p>)}
         </section>
-
         <section className="value-section" id="ecosystem">
           <div className="container value-grid">
             <div className="value-copy">
               <p className="eyebrow">More than a marketplace</p>
               <h2>Everything gaming,<br />connected.</h2>
-              <p>One identity for how you buy, play, connect, and compete. Your next gaming chapter starts here.</p>
-              <AppButton variant="primary" onClick={() => browse()}>Explore the marketplace <Icon name="arrow" size={18} /></AppButton>
+              <p>Explore the catalog, keep track of your saved orders and get help from your account.</p>
+              <a className="button button-primary" href="#/catalog">Explore the marketplace <Icon name="arrow" size={18} /></a>
             </div>
             <div className="ecosystem-grid">
-              <div className="eco-card featured"><span><Icon name="compass" /></span><small>DISCOVER</small><b>Find your<br />next obsession.</b><div className="eco-art"><i /><i /><i /></div></div>
-              <div className="eco-card"><span><Icon name="user" /></span><small>COMMUNITY</small><b>Squad up.<br />Stay connected.</b></div>
-              <div className="eco-card"><span><Icon name="trophy" /></span><small>COMPETE</small><b>Enter. Play.<br />Take the crown.</b></div>
+              <div className="eco-card featured"><span><Icon name="compass" /></span><small>CATALOG</small><b>Find your<br />next game.</b><div className="eco-art"><i /><i /><i /></div></div>
+              <div className="eco-card"><span><Icon name="user" /></span><small>ACCOUNT</small><b>Track saved<br />orders.</b></div>
+              <div className="eco-card"><span><Icon name="headset" /></span><small>SUPPORT</small><b>Get help<br />with an order.</b></div>
             </div>
           </div>
         </section>
-      </main>
+        </>
+      )
+      break
+    case '/catalog':
+      content = (
+        <Page title="Product catalog" intro="Explore game credits, wallet credit and gift cards in USD.">
+          <form className="catalog-search" role="search" onSubmit={(event) => { event.preventDefault(); navigate(catalogLink(activeCategory, search)) }}>
+            <label htmlFor="catalog-query">Search products</label>
+            <div><input id="catalog-query" ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Game or product name" /><button type="submit" className="button button-primary">Search</button></div>
+          </form>
+          <div className="filter-row" role="group" aria-label="Product categories">
+            {(['All', ...categories.map(({ label }) => label)] as const).map((filter) => (
+              <a aria-current={activeCategory === filter ? 'true' : undefined} className={activeCategory === filter ? 'selected' : undefined} key={filter} href={catalogLink(filter, search)}>{filter}</a>
+            ))}
+          </div>
+          {catalogNotice ?? (filteredProducts.length ? productGrid(filteredProducts) : (
+            <div className="empty-state"><Icon name="search" size={30} /><h2>No products found</h2><p>{query ? 'Try a different search.' : 'There are no products in this category yet.'}</p><AppButton onClick={() => { setSearch(''); navigate('#/catalog') }}>Reset search</AppButton></div>
+          ))}
+        </Page>
+      )
+      break
+    case '/cart':
+      content = cartPage
+      break
+    case '/account':
+      content = accountPage
+      break
+    case '/account/password':
+      content = <PasswordPage session={session} authReady={authReady} />
+      break
+    case '/support':
+      content = <SupportPage userId={userId} authReady={authReady} />
+      break
+    case '/faq':
+      content = <FaqPage />
+      break
+    case '/about':
+      content = <AboutPage />
+      break
+    case '/privacy':
+      content = <PrivacyPage />
+      break
+    case '/terms':
+      content = <TermsPage />
+      break
+    default:
+      if (route.path.startsWith('/product/') && catalogNotice) {
+        content = <Page title="Product details">{catalogNotice}</Page>
+      } else if (product) {
+        content = (
+          <Page title={product.name} intro={product.type}>
+            <p className="page-links"><a href={catalogLink(product.category)}>Back to {product.category.toLowerCase()}</a></p>
+            <div className="page-columns">
+              <div className="product-art" aria-hidden="true"><ProductArt product={product} /></div>
+              <div className="page-card order-summary">
+                <h2>{formatPrice(product.price)} USD</h2>
+                <p>Category: {product.category}</p>
+                <p className="cart-status">Check your platform and region with the publisher. Online payment and delivery are unavailable.</p>
+                <AppButton onClick={() => addToCart(product)} disabled={cart[product.id] === 99}>Add to cart</AppButton>
+                <a href="#/faq">Read the product and order FAQ</a>
+              </div>
+            </div>
+          </Page>
+        )
+      } else {
+        content = <Page title="Page not found" intro="This page or product is unavailable."><a className="button button-primary" href="#/catalog">Back to the catalog</a></Page>
+      }
+  }
 
+  return (
+    <div className="app-shell">
+      <a className="skip-link" href="#site-content" onClick={(event) => { event.preventDefault(); main.current?.focus() }}>Skip to content</a>
+      <header className="nav-wrap">
+        <nav className="nav container" aria-label="Main navigation">
+          <a className="brand" href="#/" aria-label="Gaming Ecosystem home">
+            <span className="brand-mark"><Icon name="gamepad" size={22} /></span>
+            <span>Gaming <b>Ecosystem</b></span>
+          </a>
+          <div id="main-menu" className={`nav-links ${mobileOpen ? 'is-open' : ''}`}>
+            <a href="#/catalog" onClick={() => setMobileOpen(false)} aria-current={route.path === '/catalog' || route.path.startsWith('/product/') ? 'page' : undefined}>Marketplace</a>
+            <a href="#/support" onClick={() => setMobileOpen(false)} aria-current={route.path === '/support' ? 'page' : undefined}>Support</a>
+            <a href="#/about" onClick={() => setMobileOpen(false)} aria-current={route.path === '/about' ? 'page' : undefined}>About</a>
+          </div>
+          <div className="nav-actions">
+            <span className="region-button"><Icon name="globe" size={18} /><span>HT / USD</span></span>
+            <a className="button button-dark" aria-label={session ? 'My account' : 'Sign in'} href="#/account" aria-current={route.path === '/account' ? 'page' : undefined}><Icon name="user" size={18} /><span>{session ? 'My account' : 'Sign in'}</span></a>
+            <a className="button button-icon" aria-label={`Open cart (${itemCount} items)`} href="#/cart" aria-current={route.path === '/cart' ? 'page' : undefined}>
+              <Icon name="bag" size={20} />
+              {itemCount > 0 && <span className="cart-dot" aria-hidden="true">{itemCount > 99 ? '99+' : itemCount}</span>}
+            </a>
+            <button type="button" className="button button-icon mobile-menu" aria-label="Toggle menu" aria-expanded={mobileOpen} aria-controls="main-menu" onClick={() => setMobileOpen(!mobileOpen)}><Icon name="menu" /></button>
+          </div>
+        </nav>
+      </header>
+      <main id="site-content" tabIndex={-1} className={onHome ? undefined : 'interior-main'} ref={main}>{content}</main>
       <footer>
         <div className="container footer-main">
-          <div><div className="brand footer-brand"><span className="brand-mark"><Icon name="gamepad" size={22} /></span><span>Gaming <b>Ecosystem</b></span></div><p>The operating system for your gaming life.</p></div>
-          <div className="footer-links"><div><b>Explore</b><button onClick={() => browse()}>Marketplace</button><button onClick={() => browse('Top-ups')}>Top-ups</button><button onClick={() => browse('Gift cards')}>Gift cards</button></div></div>
+          <div><a className="brand footer-brand" href="#/"><span className="brand-mark"><Icon name="gamepad" size={22} /></span><span>Gaming <b>Ecosystem</b></span></a><p>Built for players in Haiti and the Caribbean.</p></div>
+          <nav className="footer-links" aria-label="Footer navigation">
+            <div><b>Shop</b><a href="#/catalog">Marketplace</a><a href={catalogLink('Top-ups')}>Top-ups</a><a href={catalogLink('Gift cards')}>Gift cards</a></div>
+            <div><b>Help</b><a href="#/support">Support center</a><a href="#/faq">FAQ</a><a href="#/account">My orders</a></div>
+            <div><b>Company</b><a href="#/about">About</a><a href="#/privacy">Privacy notice</a><a href="#/terms">Storefront terms</a></div>
+          </nav>
         </div>
-        <div className="container footer-bottom"><span>© {new Date().getFullYear()} Gaming Entertainment Ecosystem</span><span>Built for the Caribbean. Ready for the world.</span></div>
+        <div className="container footer-bottom"><span>© {new Date().getFullYear()} Gaming Entertainment Ecosystem</span><span>Haiti · USD</span></div>
       </footer>
-
-      <dialog className="shop-dialog" aria-labelledby="product-title" ref={productDialog}>
-        <div className="shop-dialog-header">
-          <h2 id="product-title">{selectedProduct?.name ?? 'Product details'}</h2>
-          <AppButton variant="ghost" onClick={() => productDialog.current?.close()}>Close</AppButton>
-        </div>
-        {selectedProduct && (
-          <div className="shop-dialog-body">
-            <p>{selectedProduct.type}</p>
-            <p>From <strong>{formatPrice(selectedProduct.price)}</strong> USD</p>
-            <AppButton onClick={() => addToCart(selectedProduct)} disabled={cart[selectedProduct.id] === 99}>Add to cart</AppButton>
-          </div>
-        )}
-      </dialog>
-
-      <dialog className="shop-dialog" aria-labelledby="cart-title" ref={cartDialog}>
-        <div className="shop-dialog-header">
-          <h2 id="cart-title">Your cart</h2>
-          <AppButton variant="ghost" onClick={() => cartDialog.current?.close()}>Close</AppButton>
-        </div>
-        {cartItems.length === 0 ? <p className="shop-dialog-body">Your cart is empty.</p> : (
-          <div className="shop-dialog-body">
-            <ul className="cart-list">
-              {cartItems.map(({ product, quantity }) => (
-                <li key={product.id}>
-                  <div><strong>{product.name}</strong><p>{product.type} · {formatPrice(product.price)} each</p></div>
-                  <div className="cart-quantity">
-                    <AppButton variant="ghost" ariaLabel={`Decrease ${product.name} quantity`} onClick={() => changeQuantity(product.id, -1)} disabled={orderState === 'saving'}>−</AppButton>
-                    <span aria-label={`${product.name} quantity`}>{quantity}</span>
-                    <AppButton variant="ghost" ariaLabel={`Increase ${product.name} quantity`} onClick={() => changeQuantity(product.id, 1)} disabled={quantity === 99 || orderState === 'saving'}>+</AppButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <p className="cart-subtotal" aria-live="polite"><strong>Estimated subtotal</strong><strong>{formatPrice(subtotal)} USD</strong></p>
-            <p className="cart-status">You can save your order now. Online payment is unavailable.</p>
-            {orderState === 'error' && <p role="alert">We could not confirm your order. Try again or check your order history.</p>}
-            {session
-              ? <AppButton onClick={() => void createOrder()} disabled={orderState === 'saving'}>{orderState === 'saving' ? 'Saving order…' : 'Save order'}</AppButton>
-              : <AppButton onClick={openAccount} disabled={!supabase}>Sign in to save your order</AppButton>}
-          </div>
-        )}
-      </dialog>
-      <dialog className="shop-dialog" aria-labelledby="account-title" ref={accountDialog}>
-        <div className="shop-dialog-header">
-          <h2 id="account-title">{session ? 'My account' : 'Sign in'}</h2>
-          <AppButton variant="ghost" onClick={() => accountDialog.current?.close()}>Close</AppButton>
-        </div>
-        <AccountPanel
-          key={userId ?? 'guest'}
-          session={session}
-          orders={orders?.owner === userId ? orders ?? undefined : undefined}
-          createdOrder={createdOrder?.owner === userId ? createdOrder?.id : undefined}
-          retry={() => { setOrders(null); setOrderRefresh((value) => value + 1) }}
-          onCart={() => { accountDialog.current?.close(); cartDialog.current?.showModal() }}
-          hasCart={itemCount > 0}
-        />
-      </dialog>
     </div>
   )
 }
