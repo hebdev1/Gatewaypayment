@@ -15,7 +15,7 @@ const statuses: Record<Request['status'], string> = {
   resolved: 'Resolved',
 }
 
-function Requests() {
+function Requests({ orderRef }: { orderRef?: string }) {
   const [list, setList] = useState<Request[] | null>(null)
   const [listError, setListError] = useState(false)
   const [refresh, setRefresh] = useState(0)
@@ -74,13 +74,13 @@ function Requests() {
   }
 
   return (
-    <div className="page-columns">
+    <div className="page-columns support-requests">
       <div className="page-card">
         <h2>Send a support request</h2>
         <form className="shop-dialog-body auth-form" onSubmit={(event) => void submit(event)}>
           <p className="cart-status">Include the order reference if relevant. Leave out payment details, passwords and gift codes.</p>
           <label>Subject<input name="subject" minLength={4} maxLength={120} required /></label>
-          <label>Message<textarea name="message" rows={5} minLength={10} maxLength={2000} required /></label>
+          <label>Message<textarea name="message" rows={5} minLength={10} maxLength={2000} defaultValue={orderRef ? `Order reference: ${orderRef}\n\n` : ''} required /></label>
           {error && <p role="alert">{error}</p>}
           {result && <p role="status">{result}</p>}
           <button className="button button-primary" type="submit" disabled={sending}>{sending ? 'Sending…' : 'Send request'}</button>
@@ -105,15 +105,18 @@ function Requests() {
   )
 }
 
-export function SupportPage({ userId, authReady }: { userId?: string; authReady: boolean }) {
+export function SupportPage({ userId, authReady, orderRef }: { userId?: string; authReady: boolean; orderRef?: string }) {
+  const order = orderRef && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(orderRef) ? orderRef : undefined
   return (
-    <Page title="Support center" intro="Find answers or send a private request about your account or an order.">
-      <p className="page-links"><a href="#/faq">Read the FAQ</a><a href="#/account">View your orders</a></p>
-      {!authReady ? <p role="status">Checking your sign-in…</p> : userId ? <Requests key={userId} /> : (
-        <div className="page-copy">
-          <h2>Need to send a request?</h2>
-          <p>Sign in so your request can be linked to your account.</p>
-          <a className="button button-primary" href="#/account?returnTo=support">Sign in for support</a>
+    <Page title="Support center" className="support-page" intro="Find an answer, look up an order or send us a private request.">
+      <div className="support-topics">
+        <a href="#/account"><strong>Find an order</strong><span>See its status and find the order reference.</span></a>
+        <a href="#/faq"><strong>Read the FAQ</strong><span>Answers about products, account access and saving orders.</span></a>
+      </div>
+      {!authReady ? <p role="status">Checking your sign-in…</p> : userId ? <Requests key={`${userId}:${order ?? ''}`} orderRef={order} /> : (
+        <div className="support-guest">
+          <div><h2>Send a support request</h2><p>Sign in to send a private message and track its status here.</p><a className="button button-primary" href="#/account?returnTo=support">Sign in for support</a></div>
+          <aside><h3>Before you write</h3><ul><li>Include your order reference if you have one.</li><li>Tell us the product name and what happened.</li><li>Keep passwords and gift codes private.</li></ul></aside>
         </div>
       )}
     </Page>

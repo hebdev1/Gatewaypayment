@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { AccountPanel, PasswordPage } from './AccountPanel'
 import { AboutPage, FaqPage, Page, PrivacyPage, TermsPage } from './InfoPages'
 import { SupportPage } from './SupportPage'
+import { getProductDetails } from './productDetails'
 import { catalogLink, navigate, readRoute } from './routes'
 import { fetchOrders, fetchProducts, formatPrice, supabase, type Order, type Product } from './store'
 
@@ -47,10 +48,10 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 }
 
 const categories = [
-  { label: 'Top-ups', detail: 'Instant game credit', icon: 'bolt' as IconName },
-  { label: 'Gift cards', detail: 'Global & regional', icon: 'gift' as IconName },
+  { label: 'Top-ups', detail: 'In-game currency', icon: 'bolt' as IconName },
+  { label: 'Gift cards', detail: 'Store and wallet credit', icon: 'gift' as IconName },
   { label: 'Game codes', detail: 'PC & console', icon: 'gamepad' as IconName },
-  { label: 'Subscriptions', detail: 'Play without limits', icon: 'spark' as IconName },
+  { label: 'Subscriptions', detail: 'Memberships', icon: 'spark' as IconName },
 ] as const
 
 type Category = 'All' | (typeof categories)[number]['label']
@@ -73,13 +74,27 @@ function AppButton({ children, variant = 'primary', onClick, ariaLabel, expanded
   return <button type="button" className={`button button-${variant}`} onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} disabled={disabled}>{children}</button>
 }
 
+const catalogScenes: Record<string, string> = {
+  'free-fire': '0% 0%',
+  'pubg-mobile': '100% 0%',
+  'call-of-duty': '0% 33.333%',
+  'mobile-legends': '100% 33.333%',
+  roblox: '0% 66.667%',
+  valorant: '100% 66.667%',
+  steam: '0% 100%',
+  playstation: '100% 100%',
+}
+
 function ProductArt({ product }: { product: Product }) {
+  const scene = catalogScenes[product.id]
   return (
     <>
       <span className={`art-bg tone-${product.tone}`} />
-      <span className="art-noise" />
-      <strong>{product.mark}</strong>
-      {product.tag && <span className="product-tag">{product.tag}</span>}
+      {scene ? (
+        <span className="product-scene" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}catalog-art.webp)`, backgroundPosition: scene }} />
+      ) : (
+        <><span className="art-noise" /><strong>{product.mark}</strong></>
+      )}
     </>
   )
 }
@@ -91,6 +106,8 @@ function routeCategory(value: string | null): Category {
 export default function App() {
   const [route, setRoute] = useState(readRoute)
   const [search, setSearch] = useState(() => route.params.get('q') ?? '')
+  const [sort, setSort] = useState('featured')
+  const [quantity, setQuantity] = useState(1)
   const activeCategory = routeCategory(route.params.get('category'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cart, setCart] = useState(loadCart)
@@ -119,6 +136,7 @@ export default function App() {
       const next = readRoute()
       setRoute(next)
       setSearch(next.params.get('q') ?? '')
+      setQuantity(1)
       setMobileOpen(false)
     }
     window.addEventListener('hashchange', readHash)
@@ -202,6 +220,10 @@ export default function App() {
     (activeCategory === 'All' || product.category === activeCategory) &&
     `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query)
   )
+  if (sort === 'price-low') filteredProducts.sort((left, right) => left.price - right.price)
+  if (sort === 'price-high') filteredProducts.sort((left, right) => right.price - left.price)
+  if (sort === 'name') filteredProducts.sort((left, right) => left.name.localeCompare(right.name))
+
   const cartItems = products.flatMap((product) => {
     const quantity = cart[product.id]
     return quantity ? [{ product, quantity }] : []
@@ -221,8 +243,8 @@ export default function App() {
     })
   }
 
-  function addToCart(product: Product) {
-    changeQuantity(product.id, 1)
+  function addToCart(product: Product, units = 1) {
+    changeQuantity(product.id, units)
     navigate('#/cart')
   }
 
@@ -291,10 +313,12 @@ export default function App() {
             <ProductArt product={item} />
           </a>
           <div className="product-info">
-            <div><h3><a href={`#/product/${item.id}`}>{item.name}</a></h3><p>{item.type}</p></div>
-            <button className="price-button" aria-label={`Add ${item.name} to cart`} onClick={() => addToCart(item)}>
-              <span>{formatPrice(item.price)}</span><Icon name="chevron" size={16} />
-            </button>
+            <p>{item.category} <span aria-hidden="true">/</span> {item.type}</p>
+            <h3><a href={`#/product/${item.id}`}>{item.name}</a></h3>
+            <div className="product-action">
+              <strong>{formatPrice(item.price)} <small>USD</small></strong>
+              <button className="price-button" aria-label={`Add ${item.name} to cart`} onClick={() => addToCart(item)}><Icon name="bag" size={17} /></button>
+            </div>
           </div>
         </article>
       ))}
@@ -302,31 +326,38 @@ export default function App() {
   )
 
   const cartPage = (
-    <Page title="Your cart" intro="Review your items and save an order to your account.">
+    <Page title="Your cart" className="cart-page" intro="Review your items before saving the order.">
       {catalogNotice ?? (
         cartItems.length === 0
-          ? <div className="page-copy"><p>Your cart is empty.</p><a className="button button-primary" href="#/catalog">Browse products</a></div>
-          : <div className="page-columns">
-            <div className="page-card">
-              <h2>Items</h2>
+          ? <div className="cart-empty"><Icon name="bag" size={36} /><h2>Your cart is empty.</h2><p>Explore game credit, wallet credit and gift cards.</p><a className="button button-primary" href="#/catalog">Browse products <Icon name="arrow" size={17} /></a></div>
+          : <div className="page-columns cart-layout">
+            <div className="page-card cart-panel">
+              <h2>Items <span>{itemCount}</span></h2>
               <ul className="cart-list">
                 {cartItems.map(({ product: item, quantity }) => (
                   <li key={item.id}>
-                    <div><strong><a href={`#/product/${item.id}`}>{item.name}</a></strong><p>{item.type} · {formatPrice(item.price)} each</p></div>
+                    <div className="cart-item-info">
+                      <div className="product-art cart-thumbnail" aria-hidden="true"><ProductArt product={item} /></div>
+                      <div><strong><a href={`#/product/${item.id}`}>{item.name}</a></strong><p>{item.type} · {formatPrice(item.price)} each</p></div>
+                    </div>
                     <div className="cart-quantity">
                       <AppButton variant="ghost" ariaLabel={`Decrease ${item.name} quantity`} onClick={() => changeQuantity(item.id, -1)} disabled={orderState === 'saving'}>−</AppButton>
                       <span>{quantity}</span>
                       <AppButton variant="ghost" ariaLabel={`Increase ${item.name} quantity`} onClick={() => changeQuantity(item.id, 1)} disabled={quantity === 99 || orderState === 'saving'}>+</AppButton>
                     </div>
+                    <div className="cart-line-total">
+                      <strong>{formatPrice(item.price * quantity)}</strong>
+                      <button type="button" className="cart-remove" aria-label={`Remove ${item.name} from cart`} onClick={() => changeQuantity(item.id, -quantity)} disabled={orderState === 'saving'}>Remove</button>
+                    </div>
                   </li>
                 ))}
               </ul>
-              <a href="#/catalog">Continue browsing</a>
+              <a className="card-link" href="#/catalog">Continue browsing <Icon name="arrow" size={16} /></a>
             </div>
-            <div className="page-card order-summary">
+            <div className="page-card order-summary cart-summary">
               <h2>Order summary</h2>
               <p className="cart-subtotal" aria-live="polite"><strong>Estimated subtotal</strong><strong>{formatPrice(subtotal)} USD</strong></p>
-              <p className="cart-status">Online payment and digital delivery are unavailable. Saving your order does not charge you.</p>
+              <p className="order-notice"><Icon name="shield" size={19} /><span>Saving an order does not charge you. Online payments and delivery are unavailable.</span></p>
               {orderState === 'error' && <p role="alert">We could not confirm your order. Try again or check your order history.</p>}
               {!authReady ? <p role="status">Checking your sign-in…</p> : session
                 ? <AppButton onClick={() => void createOrder()} disabled={orderState === 'saving'}>{orderState === 'saving' ? 'Saving order…' : 'Save order'}</AppButton>
@@ -338,8 +369,9 @@ export default function App() {
   )
 
   const accountPage = (
-    <Page title={session ? 'My account' : 'Sign in'} intro="Manage your access and find the orders you have saved.">
-      <div className="page-card narrow-card">
+    <Page title={session ? 'My account' : 'Sign in'} className="account-page" intro={session ? 'Review your account and order history.' : 'Access your saved orders and support requests.'}>
+      <div className="account-layout">
+      <div className="page-card account-primary">
         {route.params.get('password') === 'updated' && session && <p role="status">Your password was updated.</p>}
         {!authReady ? <p role="status">Checking your sign-in…</p> : <AccountPanel
           key={userId ?? 'guest'}
@@ -352,6 +384,14 @@ export default function App() {
           returnTo={route.params.get('returnTo') === 'support' ? 'support' : undefined}
         />}
       </div>
+      <aside className="account-aside">
+        <Icon name="user" size={28} />
+        <h2>{session ? 'Account tools' : 'Your player account'}</h2>
+        <p>{session ? 'Get help with an order or update how you sign in.' : 'Save your cart as an order and keep the details, prices and status in one place.'}</p>
+        <a href="#/support">Support center <Icon name="arrow" size={15} /></a>
+        <a href="#/privacy">Privacy notice <Icon name="arrow" size={15} /></a>
+      </aside>
+      </div>
     </Page>
   )
 
@@ -360,85 +400,77 @@ export default function App() {
     case '/':
       content = (
         <>
-        <section className="hero">
+        <section className="hero storefront-hero">
           <div className="hero-grid container">
             <div className="hero-copy">
-              <div className="status-pill"><span /> Built for players, everywhere</div>
+              <p className="hero-kicker"><Icon name="gamepad" size={17} /> Digital gaming marketplace</p>
               <h1>Your games.<br /><em>One universe.</em></h1>
-              <p>Find game credits and gift cards, compare prices in USD and save an order from your account.</p>
+              <p>Browse game credit and gift cards for the platforms you play. Compare prices in USD and save an order in your account.</p>
+              <div className="hero-actions">
+                <a className="button button-primary" href="#/catalog">Explore catalog <Icon name="arrow" size={18} /></a>
+                <a className="hero-secondary" href={catalogLink('Gift cards')}>Browse gift cards</a>
+              </div>
               <form className="hero-search" role="search" onSubmit={(event) => { event.preventDefault(); navigate(catalogLink('All', search)) }}>
-                <Icon name="search" />
-                <input ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search games and gift cards…" aria-label="Search marketplace" aria-keyshortcuts="Control+K Meta+K" />
-                <kbd>Ctrl / ⌘ K</kbd>
-                <button className="button button-primary" type="submit">Search</button>
+                <Icon name="search" size={18} />
+                <input ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search games or gift cards" aria-label="Search marketplace" aria-keyshortcuts="Control+K Meta+K" />
+                <button className="button button-ghost" type="submit">Search</button>
               </form>
             </div>
-
-            <div className="hero-visual" aria-label="Illustration of a gaming wallet concept">
-              <div className="orb orb-one" />
-              <div className="orb orb-two" />
-              <div className="game-card card-back">
-                <span>GLOBAL PASS</span><b>PLAY+</b><small>365 days of play</small>
-              </div>
-              <div className="game-card card-front">
-                <div className="card-top"><span className="mini-brand"><Icon name="gamepad" size={15} /></span><span>PLAYER WALLET</span></div>
-                <div className="balance-label">Example balance</div>
-                <strong>$124.80</strong>
-                <div className="card-bottom"><span>•••• 8042</span><span>VIRTUAL</span></div>
-              </div>
-              <div className="floating-chip chip-delivery"><span><Icon name="bolt" size={17} /></span><div><b>Delivery concept</b><small>+ 1,060 Diamonds</small></div></div>
-              <div className="floating-chip chip-level"><span><Icon name="trophy" size={17} /></span><div><b>Level 08</b><small>2,450 XP earned</small></div></div>
-            </div>
+            <img className="hero-photograph" src={import.meta.env.BASE_URL + 'controller-hero.webp'} alt="Lavender game controller beside digital gift cards" width="1200" height="800" fetchPriority="high" />
           </div>
         </section>
 
-        <section className="category-strip container">
-          {categories.map((category) => (
+        <section className="container home-category-section" aria-labelledby="category-title">
+          <div className="section-title"><h2 id="category-title">Browse by category</h2></div>
+          <div className="category-strip">
+          {categories.slice(0, 2).map((category) => (
             <a className="category-card" key={category.label} href={catalogLink(category.label)}>
-              <span className="category-icon"><Icon name={category.icon} /></span>
+              <span className="category-icon"><Icon name={category.icon} size={24} /></span>
               <span><b>{category.label}</b><small>{category.detail}</small></span>
-              <Icon name="chevron" size={18} />
+              <Icon name="arrow" size={20} />
             </a>
           ))}
+          </div>
         </section>
 
         <section className="market-section container">
-          <div className="section-title"><h2>Popular right now</h2><a className="text-link" href="#/catalog">Browse all products<Icon name="arrow" size={17} /></a></div>
+          <div className="section-title"><h2>Featured products</h2><a className="text-link" href="#/catalog">All products<Icon name="arrow" size={17} /></a></div>
           {catalogNotice ?? (products.length ? productGrid(products.slice(0, 4)) : <p>No products are available right now.</p>)}
         </section>
-        <section className="value-section" id="ecosystem">
-          <div className="container value-grid">
-            <div className="value-copy">
-              <p className="eyebrow">More than a marketplace</p>
-              <h2>Everything gaming,<br />connected.</h2>
-              <p>Explore the catalog, keep track of your saved orders and get help from your account.</p>
-              <a className="button button-primary" href="#/catalog">Explore the marketplace <Icon name="arrow" size={18} /></a>
-            </div>
-            <div className="ecosystem-grid">
-              <div className="eco-card featured"><span><Icon name="compass" /></span><small>CATALOG</small><b>Find your<br />next game.</b><div className="eco-art"><i /><i /><i /></div></div>
-              <div className="eco-card"><span><Icon name="user" /></span><small>ACCOUNT</small><b>Track saved<br />orders.</b></div>
-              <div className="eco-card"><span><Icon name="headset" /></span><small>SUPPORT</small><b>Get help<br />with an order.</b></div>
-            </div>
-          </div>
+        <section className="container home-help">
+          <div><h2>Need help with an order?</h2><p>Find your order reference or send a private request to support.</p></div>
+          <div><a className="button button-dark" href="#/support">Support center <Icon name="arrow" size={17} /></a><a className="button button-ghost" href="#/account">My orders</a></div>
         </section>
         </>
       )
       break
     case '/catalog':
       content = (
-        <Page title="Product catalog" intro="Explore game credits, wallet credit and gift cards in USD.">
-          <form className="catalog-search" role="search" onSubmit={(event) => { event.preventDefault(); navigate(catalogLink(activeCategory, search)) }}>
-            <label htmlFor="catalog-query">Search products</label>
-            <div><input id="catalog-query" ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Game or product name" /><button type="submit" className="button button-primary">Search</button></div>
-          </form>
-          <div className="filter-row" role="group" aria-label="Product categories">
-            {(['All', ...categories.map(({ label }) => label)] as const).map((filter) => (
-              <a aria-current={activeCategory === filter ? 'true' : undefined} className={activeCategory === filter ? 'selected' : undefined} key={filter} href={catalogLink(filter, search)}>{filter}</a>
-            ))}
+        <Page title="Product catalog" className="catalog-page" intro="Browse game credits, wallet credit and gift cards. All prices are in USD.">
+          <div className="catalog-layout">
+            <aside className="catalog-filters" aria-label="Product categories">
+              <h2>Categories</h2>
+              {(['All', ...categories.map(({ label }) => label)] as const).map((filter) => (
+                <a aria-current={activeCategory === filter ? 'true' : undefined} key={filter} href={catalogLink(filter, search)}>
+                  <span>{filter === 'All' ? 'All products' : filter}</span>
+                  {catalogState === 'ready' && <small>{filter === 'All' ? products.length : products.filter((item) => item.category === filter).length}</small>}
+                </a>
+              ))}
+            </aside>
+            <div className="catalog-results">
+              <form className="catalog-search" role="search" onSubmit={(event) => { event.preventDefault(); navigate(catalogLink(activeCategory, search)) }}>
+                <label className="sr-only" htmlFor="catalog-query">Search products</label>
+                <div><Icon name="search" size={18} /><input id="catalog-query" ref={searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Game or product name" /><button type="submit" className="button button-dark">Search</button></div>
+              </form>
+              <div className="catalog-toolbar">
+                <p aria-live="polite">{catalogState === 'ready' ? `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'}` : ''}</p>
+                <label>Sort by <select value={sort} onChange={(event) => setSort(event.target.value)}><option value="featured">Featured</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="name">Name: A to Z</option></select></label>
+              </div>
+              {catalogNotice ?? (filteredProducts.length ? productGrid(filteredProducts) : (
+                <div className="empty-state"><Icon name="search" size={30} /><h2>No products found</h2><p>{query ? 'Try a different search.' : 'There are no products in this category yet.'}</p><AppButton onClick={() => { setSearch(''); navigate('#/catalog') }}>Reset search</AppButton></div>
+              ))}
+            </div>
           </div>
-          {catalogNotice ?? (filteredProducts.length ? productGrid(filteredProducts) : (
-            <div className="empty-state"><Icon name="search" size={30} /><h2>No products found</h2><p>{query ? 'Try a different search.' : 'There are no products in this category yet.'}</p><AppButton onClick={() => { setSearch(''); navigate('#/catalog') }}>Reset search</AppButton></div>
-          ))}
         </Page>
       )
       break
@@ -452,7 +484,7 @@ export default function App() {
       content = <PasswordPage session={session} authReady={authReady} />
       break
     case '/support':
-      content = <SupportPage userId={userId} authReady={authReady} />
+      content = <SupportPage userId={userId} authReady={authReady} orderRef={route.params.get('order') ?? undefined} />
       break
     case '/faq':
       content = <FaqPage />
@@ -470,20 +502,33 @@ export default function App() {
       if (route.path.startsWith('/product/') && catalogNotice) {
         content = <Page title="Product details">{catalogNotice}</Page>
       } else if (product) {
+        const details = getProductDetails(product)
+        const remaining = 99 - (cart[product.id] ?? 0)
+        const related = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4)
         content = (
-          <Page title={product.name} intro={product.type}>
-            <p className="page-links"><a href={catalogLink(product.category)}>Back to {product.category.toLowerCase()}</a></p>
-            <div className="page-columns">
-              <div className="product-art" aria-hidden="true"><ProductArt product={product} /></div>
-              <div className="page-card order-summary">
-                <h2>{formatPrice(product.price)} USD</h2>
-                <p>Category: {product.category}</p>
-                <p className="cart-status">Check your platform and region with the publisher. Online payment and delivery are unavailable.</p>
-                <AppButton onClick={() => addToCart(product)} disabled={cart[product.id] === 99}>Add to cart</AppButton>
-                <a href="#/faq">Read the product and order FAQ</a>
+          <section className="container product-page">
+            <nav className="breadcrumbs" aria-label="Breadcrumb"><a href="#/catalog">Catalog</a><Icon name="chevron" size={14} /><a href={catalogLink(product.category)}>{product.category}</a><Icon name="chevron" size={14} /><span>{product.name}</span></nav>
+            <div className="product-detail-layout">
+              <div className="product-art product-feature-art" aria-hidden="true"><ProductArt product={product} /></div>
+              <div className="product-buy">
+                <p className="product-kind">{product.type}</p>
+                <h1>{product.name}</h1>
+                <p className="product-description">{details.description}</p>
+                <p className="detail-price">{formatPrice(product.price)} <small>USD each</small></p>
+                <div className="product-buy-actions">
+                  {remaining > 0 && <label>Quantity<select value={quantity} onChange={(event) => setQuantity(Number(event.target.value))}>{Array.from({ length: Math.min(remaining, 10) }, (_, index) => <option key={index + 1}>{index + 1}</option>)}</select></label>}
+                  <AppButton onClick={() => addToCart(product, quantity)} disabled={remaining === 0}><Icon name="bag" size={19} /> {remaining ? 'Add to cart' : 'Cart limit reached'}</AppButton>
+                </div>
+                <p className="order-notice"><Icon name="shield" size={19} /><span>Orders can be saved today. Online payment and digital delivery are unavailable.</span></p>
+                <a className="card-link" href="#/faq">Order and product FAQ <Icon name="arrow" size={15} /></a>
               </div>
+              <section className="product-compatibility">
+                <h2>Compatibility</h2>
+                <dl><div><dt>Platform or game</dt><dd>{details.platform}</dd></div><div><dt>Product type</dt><dd>{product.type}</dd></div><div><dt>Before you order</dt><dd>{details.beforeOrdering}</dd></div></dl>
+              </section>
             </div>
-          </Page>
+            {related.length > 0 && <section className="related-section"><div className="section-title"><h2>More {product.category.toLowerCase()}</h2><a href={catalogLink(product.category)}>View category <Icon name="arrow" size={16} /></a></div>{productGrid(related)}</section>}
+          </section>
         )
       } else {
         content = <Page title="Page not found" intro="This page or product is unavailable."><a className="button button-primary" href="#/catalog">Back to the catalog</a></Page>
@@ -497,7 +542,7 @@ export default function App() {
         <nav className="nav container" aria-label="Main navigation">
           <a className="brand" href="#/" aria-label="Gaming Ecosystem home">
             <span className="brand-mark"><Icon name="gamepad" size={22} /></span>
-            <span>Gaming <b>Ecosystem</b></span>
+            <span className="brand-wordmark">Gaming <b>Ecosystem</b></span>
           </a>
           <div id="main-menu" className={`nav-links ${mobileOpen ? 'is-open' : ''}`}>
             <a href="#/catalog" onClick={() => setMobileOpen(false)} aria-current={route.path === '/catalog' || route.path.startsWith('/product/') ? 'page' : undefined}>Marketplace</a>
@@ -518,7 +563,7 @@ export default function App() {
       <main id="site-content" tabIndex={-1} className={onHome ? undefined : 'interior-main'} ref={main}>{content}</main>
       <footer>
         <div className="container footer-main">
-          <div><a className="brand footer-brand" href="#/"><span className="brand-mark"><Icon name="gamepad" size={22} /></span><span>Gaming <b>Ecosystem</b></span></a><p>Built for players in Haiti and the Caribbean.</p></div>
+          <div><a className="brand footer-brand" href="#/"><span className="brand-mark"><Icon name="gamepad" size={22} /></span><span className="brand-wordmark">Gaming <b>Ecosystem</b></span></a><p>Built for players in Haiti and the Caribbean.</p></div>
           <nav className="footer-links" aria-label="Footer navigation">
             <div><b>Shop</b><a href="#/catalog">Marketplace</a><a href={catalogLink('Top-ups')}>Top-ups</a><a href={catalogLink('Gift cards')}>Gift cards</a></div>
             <div><b>Help</b><a href="#/support">Support center</a><a href="#/faq">FAQ</a><a href="#/account">My orders</a></div>
