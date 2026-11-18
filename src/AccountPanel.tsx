@@ -74,7 +74,7 @@ export function AccountPanel({ session, orders, createdOrder, retry, onCart, has
     return (
       <div className="shop-dialog-body">
         <div className="account-summary">
-          <p>{session.user.email}</p>
+          <div><small>Signed in as</small><p>{session.user.email}</p></div>
           <button className="button button-ghost" type="button" disabled={busy} onClick={() => void signOut()}>Sign out</button>
         </div>
         {error && <p role="alert">{error}</p>}
@@ -87,7 +87,7 @@ export function AccountPanel({ session, orders, createdOrder, retry, onCart, has
         <ul className="orders-list">
           {orders?.list.map((order) => (
             <li key={order.id}>
-              <div><strong>{orderStatus[order.status]}</strong> · {formatPrice(order.subtotal_cents)} USD</div>
+              <div className="order-history-heading"><strong className={`order-state state-${order.status}`}>{orderStatus[order.status]}</strong><strong>{formatPrice(order.subtotal_cents)} USD</strong></div>
               <time dateTime={order.created_at}>{new Date(order.created_at).toLocaleDateString()}</time>
               <p className="reference">Reference {order.id}</p>
               <ul>
@@ -95,6 +95,7 @@ export function AccountPanel({ session, orders, createdOrder, retry, onCart, has
                   <li key={index}>{item.quantity} × {item.product_name} · {formatPrice(item.unit_price_cents)} each</li>
                 ))}
               </ul>
+              <a className="order-help-link" href={`#/support?order=${order.id}`}>Get help with this order</a>
             </li>
           ))}
         </ul>
